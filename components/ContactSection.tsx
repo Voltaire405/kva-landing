@@ -1,12 +1,58 @@
 'use client';
 
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 
 export default function ContactSection() {
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+  }>({ type: null, message: '' });
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    alert('Gracias por contactarnos. Nos comunicaremos con usted pronto.');
-    e.currentTarget.reset();
+    setIsSubmitting(true);
+    setSubmitStatus({ type: null, message: '' });
+
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name') as string,
+      email: formData.get('email') as string,
+      phone: formData.get('phone') as string,
+      message: formData.get('message') as string,
+    };
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setSubmitStatus({
+          type: 'success',
+          message: '¡Mensaje enviado correctamente! Nos comunicaremos contigo pronto.',
+        });
+        e.currentTarget.reset();
+      } else {
+        setSubmitStatus({
+          type: 'error',
+          message: result.error || 'Error al enviar el mensaje. Por favor intenta nuevamente.',
+        });
+      }
+    } catch {
+      setSubmitStatus({
+        type: 'error',
+        message: 'Error de conexión. Por favor verifica tu conexión a internet e intenta nuevamente.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -50,6 +96,17 @@ export default function ContactSection() {
 
           {/* Contact Form */}
           <div className="bg-gray-light p-5 sm:p-6 md:p-[30px] rounded-[10px] shadow-[0_5px_15px_rgba(0,0,0,0.05)]">
+            {submitStatus.type && (
+              <div
+                className={`mb-5 p-4 rounded-[5px] ${
+                  submitStatus.type === 'success'
+                    ? 'bg-green-50 border border-green-200 text-green-800'
+                    : 'bg-red-50 border border-red-200 text-red-800'
+                }`}
+              >
+                <p className="text-sm sm:text-base">{submitStatus.message}</p>
+              </div>
+            )}
             <form onSubmit={handleSubmit}>
               <div className="mb-4 sm:mb-5">
                 <label htmlFor="name" className="block mb-2 font-medium text-sm sm:text-base">
@@ -99,9 +156,10 @@ export default function ContactSection() {
               </div>
               <button
                 type="submit"
-                className="bg-primary text-white border-none py-2.5 sm:py-3 px-6 sm:px-[30px] rounded-[5px] text-sm sm:text-base font-semibold cursor-pointer transition-all duration-300 inline-block w-full sm:w-auto hover:bg-primary-dark hover:-translate-y-[2px] hover:shadow-[0_5px_15px_rgba(10,36,99,0.3)]"
+                disabled={isSubmitting}
+                className="bg-primary text-white border-none py-2.5 sm:py-3 px-6 sm:px-[30px] rounded-[5px] text-sm sm:text-base font-semibold cursor-pointer transition-all duration-300 inline-block w-full sm:w-auto hover:bg-primary-dark hover:-translate-y-[2px] hover:shadow-[0_5px_15px_rgba(10,36,99,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none"
               >
-                Enviar mensaje
+                {isSubmitting ? 'Enviando...' : 'Enviar mensaje'}
               </button>
             </form>
           </div>
