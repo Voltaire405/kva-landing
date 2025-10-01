@@ -1,8 +1,10 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 export default function ContactSection() {
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{
     type: 'success' | 'error' | null;
@@ -14,15 +16,31 @@ export default function ContactSection() {
     setIsSubmitting(true);
     setSubmitStatus({ type: null, message: '' });
 
-    const formData = new FormData(e.currentTarget);
-    const data = {
-      name: formData.get('name') as string,
-      email: formData.get('email') as string,
-      phone: formData.get('phone') as string,
-      message: formData.get('message') as string,
-    };
+    const form = e.currentTarget;
+
+    // Verificar que reCAPTCHA esté disponible
+    if (!executeRecaptcha) {
+      setSubmitStatus({
+        type: 'error',
+        message: 'reCAPTCHA no está disponible. Por favor recarga la página.',
+      });
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
+      // Obtener token de reCAPTCHA
+      const recaptchaToken = await executeRecaptcha('contact_form');
+
+      const formData = new FormData(form);
+      const data = {
+        name: formData.get('name') as string,
+        email: formData.get('email') as string,
+        phone: formData.get('phone') as string,
+        message: formData.get('message') as string,
+        recaptchaToken,
+      };
+
       const response = await fetch('/api/contact', {
         method: 'POST',
         headers: {
@@ -38,7 +56,7 @@ export default function ContactSection() {
           type: 'success',
           message: '¡Mensaje enviado correctamente! Nos comunicaremos contigo pronto.',
         });
-        e.currentTarget.reset();
+        form.reset();
       } else {
         console.error('Error del servidor:', result);
         setSubmitStatus({
@@ -52,7 +70,6 @@ export default function ContactSection() {
         type: 'error',
         message: `Error de conexión: ${err instanceof Error ? err.message : 'Por favor verifica tu conexión a internet e intenta nuevamente.'}`,
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -163,6 +180,17 @@ export default function ContactSection() {
               >
                 {isSubmitting ? 'Enviando...' : 'Enviar mensaje'}
               </button>
+              <p className="text-xs text-gray-500 mt-4">
+                Este sitio está protegido por reCAPTCHA y se aplican la{' '}
+                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  Política de privacidad
+                </a>{' '}
+                y los{' '}
+                <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  Términos de servicio
+                </a>{' '}
+                de Google.
+              </p>
             </form>
           </div>
         </div>
