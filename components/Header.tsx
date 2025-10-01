@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -23,11 +24,16 @@ export default function Header() {
         <div className="flex justify-between items-center">
           {/* Logo */}
           <div className="flex items-center text-white">
-            <img
-              src="/android-chrome-192x192.png"
-              alt="KvaTel Logo"
-              className="h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 object-contain"
-            />
+            <div className="relative h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16">
+              <Image
+                src="/android-chrome-192x192.png"
+                alt="KvaTel Logo"
+                fill
+                sizes="(max-width: 768px) 40px, (max-width: 1200px) 48px, 64px"
+                className="object-contain"
+                priority
+              />
+            </div>
             <div className="ml-2 sm:ml-[10px]">
               <div className="font-heading font-bold text-lg sm:text-xl md:text-2xl">
                 KvaTel

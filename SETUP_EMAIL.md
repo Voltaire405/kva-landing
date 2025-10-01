@@ -2,7 +2,7 @@
 
 Este proyecto utiliza **Resend** con su SDK oficial para el envío de correos electrónicos desde el formulario de contacto.
 
-> **Nota sobre Turbopack:** El build de producción (`bun run build`) no usa Turbopack debido a una incompatibilidad conocida con el SDK de Resend. El modo desarrollo (`bun run dev`) sigue usando Turbopack para mayor velocidad.
+> **Nota sobre Turbopack:** Turbopack ha sido deshabilitado tanto en desarrollo como en producción debido a incompatibilidades con el SDK de Resend. El proyecto usa el compilador estándar de Next.js que es completamente compatible.
 
 ## 🚀 Pasos de Configuración
 

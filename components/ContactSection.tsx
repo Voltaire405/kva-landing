@@ -40,15 +40,17 @@ export default function ContactSection() {
         });
         e.currentTarget.reset();
       } else {
+        console.error('Error del servidor:', result);
         setSubmitStatus({
           type: 'error',
           message: result.error || 'Error al enviar el mensaje. Por favor intenta nuevamente.',
         });
       }
-    } catch {
+    } catch (err) {
+      console.error('Error en el fetch:', err);
       setSubmitStatus({
         type: 'error',
-        message: 'Error de conexión. Por favor verifica tu conexión a internet e intenta nuevamente.',
+        message: `Error de conexión: ${err instanceof Error ? err.message : 'Por favor verifica tu conexión a internet e intenta nuevamente.'}`,
       });
     } finally {
       setIsSubmitting(false);

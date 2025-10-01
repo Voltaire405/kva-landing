@@ -5,8 +5,19 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar que las variables de entorno estén configuradas
+    if (!process.env.RESEND_API_KEY) {
+      console.error('RESEND_API_KEY no está configurado');
+      return NextResponse.json(
+        { error: 'Configuración del servidor incompleta. Contacte al administrador.' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const { name, email, phone, message } = body;
+
+    console.log('Datos recibidos:', { name, email, phone: phone ? 'presente' : 'no', message: message?.substring(0, 50) });
 
     // Validación básica
     if (!name || !email || !message) {
@@ -24,6 +35,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log('Intentando enviar email a:', process.env.ADMIN_EMAIL);
 
     // Enviar email usando Resend
     const { data, error } = await resend.emails.send({
@@ -117,21 +130,23 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error('Error enviando email:', error);
+      console.error('Error de Resend:', JSON.stringify(error, null, 2));
       return NextResponse.json(
-        { error: 'Error al enviar el mensaje. Por favor intente nuevamente.' },
+        { error: `Error al enviar el mensaje: ${error.message || 'Por favor intente nuevamente.'}` },
         { status: 500 }
       );
     }
 
+    console.log('Email enviado exitosamente:', data);
     return NextResponse.json(
       { success: true, message: 'Mensaje enviado correctamente', data },
       { status: 200 }
     );
   } catch (error) {
     console.error('Error en API de contacto:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     return NextResponse.json(
-      { error: 'Error interno del servidor. Por favor intente más tarde.' },
+      { error: `Error interno del servidor: ${errorMessage}` },
       { status: 500 }
     );
   }
