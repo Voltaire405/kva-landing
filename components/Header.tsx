@@ -24,9 +24,9 @@ export default function Header() {
         <div className="flex justify-between items-center">
           {/* Logo */}
           <div className="flex items-center text-white">
-            <div className="relative h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16">
+            <div className="relative h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 opacity-80">
               <Image
-                src="/android-chrome-192x192.png"
+                src="/kvatel-logo.png"
                 alt="KvaTel Logo"
                 fill
                 sizes="(max-width: 768px) 40px, (max-width: 1200px) 48px, 64px"
