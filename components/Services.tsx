@@ -1,3 +1,5 @@
+import type { Service } from '@/db/schema';
+
 interface ServiceCardProps {
   icon: string;
   title: string;
@@ -16,28 +18,11 @@ function ServiceCard({ icon, title, description }: ServiceCardProps) {
   );
 }
 
-export default function Services() {
-  const services = [
-    {
-      icon: 'home',
-      title: 'Instalaciones Eléctricas Residenciales',
-      description:
-        'Soluciones eléctricas seguras y eficientes para el hogar, con personal calificado y materiales de calidad.',
-    },
-    {
-      icon: 'business',
-      title: 'Instalaciones Eléctricas Comerciales e Industriales',
-      description:
-        'Proyectos eléctricos a gran escala para empresas e industrias, cumpliendo con todas las normativas vigentes.',
-    },
-    {
-      icon: 'router',
-      title: 'Redes de Telecomunicaciones',
-      description:
-        'Diseño, instalación y mantenimiento de redes de telecomunicaciones para garantizar conectividad óptima.',
-    },
-  ];
+interface ServicesProps {
+  services: Service[];
+}
 
+export default function Services({ services }: ServicesProps) {
   return (
     <section id="servicios" className="py-12 sm:py-16 md:py-20 bg-white">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-5">
@@ -45,8 +30,13 @@ export default function Services() {
           Nuestros Servicios
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 md:gap-[30px] mt-10 sm:mt-12 md:mt-[60px]">
-          {services.map((service, index) => (
-            <ServiceCard key={index} {...service} />
+          {services.map((service) => (
+            <ServiceCard
+              key={service.id}
+              icon={service.icon}
+              title={service.title}
+              description={service.description}
+            />
           ))}
         </div>
       </div>

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { checkRateLimit, getClientIP } from '@/lib/rate-limiter';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 // Umbral mínimo de score de reCAPTCHA (0.0 - 1.0)
 // 0.5 es un buen balance entre seguridad y usabilidad
@@ -124,7 +126,7 @@ export async function POST(request: NextRequest) {
     console.log('Intentando enviar email a:', process.env.ADMIN_EMAIL);
 
     // Enviar email usando Resend
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: 'Formulario KvaTel <onboarding@resend.dev>', // Cambiar cuando tengas dominio verificado
       to: [process.env.ADMIN_EMAIL || 'kvatelsoluciones@gmail.com'],
       subject: `Nuevo mensaje de contacto de ${name}`,

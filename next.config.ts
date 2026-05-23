@@ -1,12 +1,18 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['@libsql/client', 'libsql'],
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'sfile.chatglm.cn',
         pathname: '/images-ppt/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+        pathname: '/**',
       },
     ],
   },

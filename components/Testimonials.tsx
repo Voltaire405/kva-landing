@@ -1,3 +1,6 @@
+import { getInitials } from '@/lib/content-defaults';
+import type { Testimonial } from '@/db/schema';
+
 interface TestimonialCardProps {
   text: string;
   authorInitials: string;
@@ -30,28 +33,11 @@ function TestimonialCard({
   );
 }
 
-export default function Testimonials() {
-  const testimonials = [
-    {
-      text: 'KvaTel ha sido nuestro aliado estratégico en todos los proyectos eléctricos de nuestra planta. Su profesionalismo y calidad de trabajo son excepcionales.',
-      authorInitials: 'JC',
-      authorName: 'Juan Carlos Martínez',
-      authorRole: 'Gerente de Operaciones, Industria Alimentaria S.A.',
-    },
-    {
-      text: 'La implementación de nuestra red de telecomunicaciones fue impecable. El equipo de KvaTel cumplió con los plazos establecidos y superó nuestras expectativas.',
-      authorInitials: 'MR',
-      authorName: 'María Rodríguez',
-      authorRole: 'Directora de TI, Tecnologías Avanzadas Ltda.',
-    },
-    {
-      text: 'Recomiendo ampliamente los servicios de KvaTel. Su atención al detalle y conocimiento técnico nos han permitido optimizar nuestros sistemas eléctricos.',
-      authorInitials: 'PL',
-      authorName: 'Pedro López',
-      authorRole: 'Administrador, Hospital Central',
-    },
-  ];
+interface TestimonialsProps {
+  testimonials: Testimonial[];
+}
 
+export default function Testimonials({ testimonials }: TestimonialsProps) {
   return (
     <section id="testimonios" className="py-12 sm:py-16 md:py-20 bg-gray-light">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-5">
@@ -59,8 +45,14 @@ export default function Testimonials() {
           Lo que dicen nuestros clientes
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 md:gap-[30px] mt-10 sm:mt-12 md:mt-[60px]">
-          {testimonials.map((testimonial, index) => (
-            <TestimonialCard key={index} {...testimonial} />
+          {testimonials.map((testimonial) => (
+            <TestimonialCard
+              key={testimonial.id}
+              text={testimonial.quote}
+              authorInitials={getInitials(testimonial.authorName)}
+              authorName={testimonial.authorName}
+              authorRole={testimonial.authorRole}
+            />
           ))}
         </div>
       </div>
