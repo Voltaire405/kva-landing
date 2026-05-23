@@ -10,6 +10,7 @@ import {
   getNextSortOrder,
   listServices,
 } from '@/lib/content';
+import { revalidateLandingPage } from '@/lib/revalidate-landing';
 
 export async function GET() {
   const authError = await requireAdminSession();
@@ -37,5 +38,6 @@ export async function POST(request: NextRequest) {
     body.sortOrder !== undefined ? validateSortOrder(body.sortOrder) : await getNextSortOrder('services');
 
   const created = await createService({ icon, title, description, sortOrder });
+  revalidateLandingPage();
   return NextResponse.json(created, { status: 201 });
 }

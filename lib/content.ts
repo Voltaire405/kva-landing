@@ -1,6 +1,8 @@
 import { asc, desc, eq } from 'drizzle-orm';
+import { unstable_cache } from 'next/cache';
 
 import { db } from '@/db';
+import { LANDING_CONTENT_TAG } from '@/lib/revalidate-landing';
 import {
   clients,
   contactInfo,
@@ -54,9 +56,13 @@ async function fetchLandingContent(): Promise<LandingContent> {
   };
 }
 
+const getCachedLandingContent = unstable_cache(fetchLandingContent, ['landing-content'], {
+  tags: [LANDING_CONTENT_TAG],
+});
+
 export async function getLandingContent(): Promise<LandingContent> {
   try {
-    const content = await fetchLandingContent();
+    const content = await getCachedLandingContent();
 
     return {
       services: content.services.length > 0 ? content.services : defaultServices.map((item, index) => ({

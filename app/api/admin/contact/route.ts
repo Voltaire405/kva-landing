@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-auth';
 import { validateEmail, validateRequiredString } from '@/lib/admin-validation';
 import { getContactInfo, updateContactInfo } from '@/lib/content';
+import { revalidateLandingPage } from '@/lib/revalidate-landing';
 
 export async function GET() {
   const authError = await requireAdminSession();
@@ -27,5 +28,6 @@ export async function PUT(request: NextRequest) {
   if (address instanceof NextResponse) return address;
 
   const updated = await updateContactInfo({ phone, email, address });
+  revalidateLandingPage();
   return NextResponse.json(updated);
 }

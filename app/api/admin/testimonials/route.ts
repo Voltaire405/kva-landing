@@ -10,6 +10,7 @@ import {
   getNextSortOrder,
   listTestimonials,
 } from '@/lib/content';
+import { revalidateLandingPage } from '@/lib/revalidate-landing';
 
 export async function GET() {
   const authError = await requireAdminSession();
@@ -39,5 +40,6 @@ export async function POST(request: NextRequest) {
       : await getNextSortOrder('testimonials');
 
   const created = await createTestimonial({ quote, authorName, authorRole, sortOrder });
+  revalidateLandingPage();
   return NextResponse.json(created, { status: 201 });
 }

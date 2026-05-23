@@ -10,6 +10,7 @@ import {
   getNextSortOrder,
   listPortfolioItems,
 } from '@/lib/content';
+import { revalidateLandingPage } from '@/lib/revalidate-landing';
 
 export async function GET() {
   const authError = await requireAdminSession();
@@ -39,5 +40,6 @@ export async function POST(request: NextRequest) {
       : await getNextSortOrder('portfolio');
 
   const created = await createPortfolioItem({ imageUrl, title, description, sortOrder });
+  revalidateLandingPage();
   return NextResponse.json(created, { status: 201 });
 }

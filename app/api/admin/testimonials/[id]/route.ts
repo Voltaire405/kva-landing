@@ -7,6 +7,7 @@ import {
   validateSortOrder,
 } from '@/lib/admin-validation';
 import { deleteTestimonial, updateTestimonial } from '@/lib/content';
+import { revalidateLandingPage } from '@/lib/revalidate-landing';
 
 export async function PUT(
   request: NextRequest,
@@ -51,6 +52,7 @@ export async function PUT(
     return NextResponse.json({ error: 'Testimonio no encontrado' }, { status: 404 });
   }
 
+  revalidateLandingPage();
   return NextResponse.json(updated);
 }
 
@@ -68,5 +70,6 @@ export async function DELETE(
   }
 
   await deleteTestimonial(id);
+  revalidateLandingPage();
   return NextResponse.json({ success: true });
 }
