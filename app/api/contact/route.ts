@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+
+import { createContactMessage } from '@/lib/content';
+import { isContactTestMode } from '@/lib/contact-test-mode';
 import { checkRateLimit, getClientIP } from '@/lib/rate-limiter';
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
-// Umbral mínimo de score de reCAPTCHA (0.0 - 1.0)
-// 0.5 es un buen balance entre seguridad y usabilidad
 const RECAPTCHA_THRESHOLD = 0.5;
+
+type ContactEmailPayload = {
+  name: string;
+  email: string;
+  phone?: string;
+  message: string;
+};
 
 async function verifyRecaptcha(token: string): Promise<{ success: boolean; score?: number; error?: string }> {
   try {
@@ -33,7 +41,7 @@ async function verifyRecaptcha(token: string): Promise<{ success: boolean; score
       return {
         success: false,
         score: data.score,
-        error: 'Score de CAPTCHA muy bajo. Por favor intenta nuevamente.'
+        error: 'Score de CAPTCHA muy bajo. Por favor intenta nuevamente.',
       };
     }
 
@@ -44,9 +52,109 @@ async function verifyRecaptcha(token: string): Promise<{ success: boolean; score
   }
 }
 
+async function sendContactNotificationEmail({ name, email, phone, message }: ContactEmailPayload) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY no configurado — email no enviado');
+    return { data: null, error: null };
+  }
+
+  return getResend().emails.send({
+    from: 'Formulario KvaTel <onboarding@resend.dev>',
+    to: [process.env.ADMIN_EMAIL || 'kvatelsoluciones@gmail.com'],
+    subject: `Nuevo mensaje de contacto de ${name}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background-color: #0a2463;
+              color: white;
+              padding: 20px;
+              text-align: center;
+              border-radius: 5px 5px 0 0;
+            }
+            .content {
+              background-color: #f4f4f4;
+              padding: 30px;
+              border-radius: 0 0 5px 5px;
+            }
+            .field {
+              margin-bottom: 20px;
+              background-color: white;
+              padding: 15px;
+              border-radius: 5px;
+              border-left: 4px solid #0a2463;
+            }
+            .label {
+              font-weight: bold;
+              color: #0a2463;
+              margin-bottom: 5px;
+            }
+            .value {
+              color: #333;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 20px;
+              color: #666;
+              font-size: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Nuevo Mensaje de Contacto</h1>
+            </div>
+            <div class="content">
+              <div class="field">
+                <div class="label">Nombre:</div>
+                <div class="value">${name}</div>
+              </div>
+              <div class="field">
+                <div class="label">Email:</div>
+                <div class="value">${email}</div>
+              </div>
+              ${
+                phone
+                  ? `
+              <div class="field">
+                <div class="label">Teléfono:</div>
+                <div class="value">${phone}</div>
+              </div>
+              `
+                  : ''
+              }
+              <div class="field">
+                <div class="label">Mensaje:</div>
+                <div class="value">${message.replace(/\n/g, '<br>')}</div>
+              </div>
+              <div class="footer">
+                <p>Este mensaje fue enviado desde el formulario de contacto de KvaTel</p>
+                <p>Fecha: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</p>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // 1. Rate Limiting
     const clientIP = getClientIP(request.headers);
     const rateLimitResult = checkRateLimit(clientIP);
 
@@ -63,21 +171,12 @@ export async function POST(request: NextRequest) {
           headers: {
             'X-RateLimit-Remaining': '0',
             'X-RateLimit-Reset': rateLimitResult.resetAt.toString(),
-          }
+          },
         }
       );
     }
 
-    // 2. Verificar que las variables de entorno estén configuradas
-    if (!process.env.RESEND_API_KEY) {
-      console.error('RESEND_API_KEY no está configurado');
-      return NextResponse.json(
-        { error: 'Configuración del servidor incompleta. Contacte al administrador.' },
-        { status: 500 }
-      );
-    }
-
-    if (!process.env.RECAPTCHA_SECRET_KEY) {
+    if (!isContactTestMode() && !process.env.RECAPTCHA_SECRET_KEY) {
       console.error('RECAPTCHA_SECRET_KEY no está configurado');
       return NextResponse.json(
         { error: 'Configuración del servidor incompleta. Contacte al administrador.' },
@@ -88,25 +187,29 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, email, phone, message, recaptchaToken } = body;
 
-    console.log('Datos recibidos:', { name, email, phone: phone ? 'presente' : 'no', message: message?.substring(0, 50) });
+    console.log('Datos recibidos:', {
+      name,
+      email,
+      phone: phone ? 'presente' : 'no',
+      message: message?.substring(0, 50),
+    });
 
-    // 3. Validación de reCAPTCHA token
-    if (!recaptchaToken) {
-      return NextResponse.json(
-        { error: 'Token de CAPTCHA no proporcionado' },
-        { status: 400 }
-      );
+    if (!isContactTestMode()) {
+      if (!recaptchaToken) {
+        return NextResponse.json({ error: 'Token de CAPTCHA no proporcionado' }, { status: 400 });
+      }
+
+      const recaptchaResult = await verifyRecaptcha(recaptchaToken);
+      if (!recaptchaResult.success) {
+        return NextResponse.json(
+          { error: recaptchaResult.error || 'Verificación de CAPTCHA falló' },
+          { status: 400 }
+        );
+      }
+    } else {
+      console.log('CONTACT_TEST_MODE activo — reCAPTCHA omitido');
     }
 
-    const recaptchaResult = await verifyRecaptcha(recaptchaToken);
-    if (!recaptchaResult.success) {
-      return NextResponse.json(
-        { error: recaptchaResult.error || 'Verificación de CAPTCHA falló' },
-        { status: 400 }
-      );
-    }
-
-    // 4. Validación básica de campos
     if (!name || !email || !message) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos: nombre, email y mensaje son obligatorios' },
@@ -114,119 +217,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validación de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'El formato del email no es válido' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'El formato del email no es válido' }, { status: 400 });
     }
 
-    console.log('Intentando enviar email a:', process.env.ADMIN_EMAIL);
-
-    // Enviar email usando Resend
-    const { data, error } = await getResend().emails.send({
-      from: 'Formulario KvaTel <onboarding@resend.dev>', // Cambiar cuando tengas dominio verificado
-      to: [process.env.ADMIN_EMAIL || 'kvatelsoluciones@gmail.com'],
-      subject: `Nuevo mensaje de contacto de ${name}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                line-height: 1.6;
-                color: #333;
-              }
-              .container {
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-              }
-              .header {
-                background-color: #0a2463;
-                color: white;
-                padding: 20px;
-                text-align: center;
-                border-radius: 5px 5px 0 0;
-              }
-              .content {
-                background-color: #f4f4f4;
-                padding: 30px;
-                border-radius: 0 0 5px 5px;
-              }
-              .field {
-                margin-bottom: 20px;
-                background-color: white;
-                padding: 15px;
-                border-radius: 5px;
-                border-left: 4px solid #0a2463;
-              }
-              .label {
-                font-weight: bold;
-                color: #0a2463;
-                margin-bottom: 5px;
-              }
-              .value {
-                color: #333;
-              }
-              .footer {
-                text-align: center;
-                margin-top: 20px;
-                color: #666;
-                font-size: 12px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Nuevo Mensaje de Contacto</h1>
-              </div>
-              <div class="content">
-                <div class="field">
-                  <div class="label">Nombre:</div>
-                  <div class="value">${name}</div>
-                </div>
-                <div class="field">
-                  <div class="label">Email:</div>
-                  <div class="value">${email}</div>
-                </div>
-                ${phone ? `
-                <div class="field">
-                  <div class="label">Teléfono:</div>
-                  <div class="value">${phone}</div>
-                </div>
-                ` : ''}
-                <div class="field">
-                  <div class="label">Mensaje:</div>
-                  <div class="value">${message.replace(/\n/g, '<br>')}</div>
-                </div>
-                <div class="footer">
-                  <p>Este mensaje fue enviado desde el formulario de contacto de KvaTel</p>
-                  <p>Fecha: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</p>
-                </div>
-              </div>
-            </div>
-          </body>
-        </html>
-      `,
+    const saved = await createContactMessage({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone?.trim() || null,
+      message: message.trim(),
     });
 
-    if (error) {
-      console.error('Error de Resend:', JSON.stringify(error, null, 2));
-      return NextResponse.json(
-        { error: `Error al enviar el mensaje: ${error.message || 'Por favor intente nuevamente.'}` },
-        { status: 500 }
-      );
+    // Email desactivado por defecto. Reactivar con SEND_CONTACT_EMAIL=true
+    if (process.env.SEND_CONTACT_EMAIL === 'true') {
+      const { error } = await sendContactNotificationEmail({
+        name: saved.name,
+        email: saved.email,
+        phone: saved.phone ?? undefined,
+        message: saved.message,
+      });
+
+      if (error) {
+        console.error('Error de Resend:', JSON.stringify(error, null, 2));
+      }
     }
 
-    console.log('Email enviado exitosamente:', data);
+    console.log('Mensaje guardado en base de datos:', saved.id);
     return NextResponse.json(
-      { success: true, message: 'Mensaje enviado correctamente', data },
+      { success: true, message: 'Mensaje enviado correctamente', id: saved.id },
       { status: 200 }
     );
   } catch (error) {

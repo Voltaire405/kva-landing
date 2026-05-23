@@ -5,13 +5,18 @@ import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
 import ContactInfoDisplay from '@/components/ContactInfo';
 import type { ContactInfo } from '@/db/schema';
+import { isContactTestModeClient } from '@/lib/contact-test-mode';
 
 interface ContactSectionProps {
   contactInfo: ContactInfo;
 }
 
-export default function ContactSection({ contactInfo }: ContactSectionProps) {
-  const { executeRecaptcha } = useGoogleReCaptcha();
+interface ContactFormProps extends ContactSectionProps {
+  getRecaptchaToken?: () => Promise<string>;
+  showRecaptchaNotice: boolean;
+}
+
+function ContactForm({ contactInfo, getRecaptchaToken, showRecaptchaNotice }: ContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{
     type: 'success' | 'error' | null;
@@ -25,17 +30,12 @@ export default function ContactSection({ contactInfo }: ContactSectionProps) {
 
     const form = e.currentTarget;
 
-    if (!executeRecaptcha) {
-      setSubmitStatus({
-        type: 'error',
-        message: 'reCAPTCHA no está disponible. Por favor recarga la página.',
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      const recaptchaToken = await executeRecaptcha('contact_form');
+      let recaptchaToken: string | undefined;
+
+      if (getRecaptchaToken) {
+        recaptchaToken = await getRecaptchaToken();
+      }
 
       const formData = new FormData(form);
       const data = {
@@ -43,7 +43,7 @@ export default function ContactSection({ contactInfo }: ContactSectionProps) {
         email: formData.get('email') as string,
         phone: formData.get('phone') as string,
         message: formData.get('message') as string,
-        recaptchaToken,
+        ...(recaptchaToken ? { recaptchaToken } : {}),
       };
 
       const response = await fetch('/api/contact', {
@@ -155,31 +155,61 @@ export default function ContactSection({ contactInfo }: ContactSectionProps) {
               >
                 {isSubmitting ? 'Enviando...' : 'Enviar mensaje'}
               </button>
-              <p className="text-xs text-gray-500 mt-4">
-                Este sitio está protegido por reCAPTCHA y se aplican la{' '}
-                <a
-                  href="https://policies.google.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Política de privacidad
-                </a>{' '}
-                y los{' '}
-                <a
-                  href="https://policies.google.com/terms"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Términos de servicio
-                </a>{' '}
-                de Google.
-              </p>
+              {showRecaptchaNotice && (
+                <p className="text-xs text-gray-500 mt-4">
+                  Este sitio está protegido por reCAPTCHA y se aplican la{' '}
+                  <a
+                    href="https://policies.google.com/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Política de privacidad
+                  </a>{' '}
+                  y los{' '}
+                  <a
+                    href="https://policies.google.com/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Términos de servicio
+                  </a>{' '}
+                  de Google.
+                </p>
+              )}
             </form>
           </div>
         </div>
       </div>
     </section>
   );
+}
+
+function ContactSectionWithRecaptcha(props: ContactSectionProps) {
+  const { executeRecaptcha } = useGoogleReCaptcha();
+
+  const getRecaptchaToken = async () => {
+    if (!executeRecaptcha) {
+      throw new Error('reCAPTCHA no está disponible');
+    }
+
+    return executeRecaptcha('contact_form');
+  };
+
+  return (
+    <ContactForm
+      {...props}
+      getRecaptchaToken={getRecaptchaToken}
+      showRecaptchaNotice
+    />
+  );
+}
+
+export default function ContactSection(props: ContactSectionProps) {
+  if (isContactTestModeClient()) {
+    return <ContactForm {...props} showRecaptchaNotice={false} />;
+  }
+
+  return <ContactSectionWithRecaptcha {...props} />;
 }

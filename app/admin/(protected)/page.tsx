@@ -29,6 +29,11 @@ const sections = [
     description: 'Teléfono, email y dirección.',
   },
   {
+    href: '/admin/messages',
+    title: 'Mensajes',
+    description: 'Mensajes recibidos del formulario de contacto.',
+  },
+  {
     href: '/admin/settings',
     title: 'Configuración',
     description: 'Código de acceso al panel de administración.',

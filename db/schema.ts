@@ -98,6 +98,23 @@ export const adminSettings = sqliteTable('admin_settings', {
     .notNull(),
 });
 
+export const contactMessages = sqliteTable(
+  'contact_messages',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    phone: text('phone'),
+    message: text('message').notNull(),
+    createdAt: text('created_at')
+      .default(sql`(datetime('now'))`)
+      .notNull(),
+  },
+  (table) => ({
+    createdAtIdx: index('idx_contact_messages_created_at').on(table.createdAt),
+  })
+);
+
 export type Service = typeof services.$inferSelect;
 export type NewService = typeof services.$inferInsert;
 export type PortfolioItem = typeof portfolioItems.$inferSelect;
@@ -107,4 +124,6 @@ export type NewClient = typeof clients.$inferInsert;
 export type Testimonial = typeof testimonials.$inferSelect;
 export type NewTestimonial = typeof testimonials.$inferInsert;
 export type ContactInfo = typeof contactInfo.$inferSelect;
+export type ContactMessage = typeof contactMessages.$inferSelect;
+export type NewContactMessage = typeof contactMessages.$inferInsert;
 export type AdminSettings = typeof adminSettings.$inferSelect;

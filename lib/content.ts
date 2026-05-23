@@ -1,14 +1,16 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
 import {
   clients,
   contactInfo,
+  contactMessages,
   portfolioItems,
   services,
   testimonials,
   type Client,
   type ContactInfo,
+  type NewContactMessage,
   type NewClient,
   type NewPortfolioItem,
   type NewService,
@@ -266,4 +268,19 @@ export async function getNextSortOrder(table: 'services' | 'portfolio' | 'client
     .orderBy(asc(tableMap[table].sortOrder));
 
   return rows.length;
+}
+
+export async function createContactMessage(
+  data: Omit<NewContactMessage, 'id' | 'createdAt'>
+) {
+  const [created] = await db.insert(contactMessages).values(data).returning();
+  return created;
+}
+
+export async function listContactMessages() {
+  return db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt));
+}
+
+export async function deleteContactMessage(id: number) {
+  await db.delete(contactMessages).where(eq(contactMessages.id, id));
 }
