@@ -10,15 +10,15 @@ Landing page corporativa de **KvaTel Soluciones** — instalaciones eléctricas 
 | UI | React 19, Tailwind CSS 4 |
 | Base de datos | Turso (SQLite) + Drizzle ORM |
 | Imágenes | Vercel Blob |
-| Email | Resend |
-| Anti-spam | Google reCAPTCHA v3 |
+| Email | Resend (opcional — notificación por correo) |
+| Anti-spam | Google reCAPTCHA v3 (omitible en modo test local) |
 
 ## Funcionalidades
 
 **Landing pública** (`/`)
 
 - Hero, servicios, portafolio, clientes, testimonios y contacto
-- Formulario de contacto con reCAPTCHA v3 y rate limiting por IP
+- Formulario de contacto con persistencia en Turso, reCAPTCHA v3 y rate limiting por IP
 - Contenido servido desde Turso, con fallback a valores por defecto si la BD no está disponible
 
 **Panel de administración** (`/admin`)
@@ -26,6 +26,7 @@ Landing page corporativa de **KvaTel Soluciones** — instalaciones eléctricas 
 - Acceso exclusivo por URL (sin enlaces en la landing)
 - Autenticación mediante código de acceso (bootstrap vía `.env`, persistido en Turso desde Configuración)
 - CRUD de servicios, trabajos, clientes, testimonios e información de contacto
+- Bandeja de mensajes recibidos del formulario (`/admin/messages`): listado, lectura y eliminación
 - Subida de imágenes del portafolio a Vercel Blob
 
 ## Estructura del proyecto
@@ -35,15 +36,16 @@ app/
   page.tsx                 # Landing (composición de secciones)
   admin/                   # Panel de administración
   api/
-    contact/               # Envío del formulario de contacto
-    admin/                 # API CRUD + auth + upload
+    contact/               # Envío del formulario → Turso (email opcional)
+    admin/                 # API CRUD + auth + upload + messages
 components/                # Secciones de la landing y UI del admin
 db/
   schema.ts                # Esquema Drizzle
   seed.ts                  # Datos iniciales
 lib/
-  content.ts               # Queries de contenido
+  content.ts               # Queries de contenido y mensajes de contacto
   admin-auth.ts            # Sesión del panel
+  contact-test-mode.ts     # Bypass de reCAPTCHA en desarrollo
 drizzle/                   # Migraciones generadas
 ```
 
@@ -54,7 +56,8 @@ Documentación adicional: [SETUP_EMAIL.md](./SETUP_EMAIL.md) (configuración det
 - [Bun](https://bun.sh) (recomendado) o Node.js 20+
 - Cuenta en [Turso](https://turso.tech)
 - Cuenta en [Vercel](https://vercel.com) con Blob Storage (para imágenes del portafolio)
-- Cuenta en [Resend](https://resend.com) y [Google reCAPTCHA v3](https://www.google.com/recaptcha/admin) (formulario de contacto)
+- Cuenta en [Resend](https://resend.com) (solo si quieres notificación por email)
+- Claves de [Google reCAPTCHA v3](https://www.google.com/recaptcha/admin) (requeridas en producción)
 
 ## Configuración local
 
@@ -74,15 +77,18 @@ Completar todas las variables en `.env.local`:
 
 | Variable | Uso |
 |---|---|
-| `RESEND_API_KEY` | Envío de emails del formulario |
-| `ADMIN_EMAIL` | Destinatario de mensajes de contacto |
-| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | reCAPTCHA (cliente) |
-| `RECAPTCHA_SECRET_KEY` | reCAPTCHA (servidor) |
-| `ADMIN_ACCESS_CODE` | Código de acceso bootstrap al panel `/admin` (solo hasta guardar uno nuevo en Configuración) |
 | `TURSO_DATABASE_URL` | URL de la base Turso |
 | `TURSO_AUTH_TOKEN` | Token de autenticación Turso |
+| `ADMIN_ACCESS_CODE` | Código de acceso bootstrap al panel `/admin` (solo hasta guardar uno nuevo en Configuración) |
 | `BLOB_READ_WRITE_TOKEN` | Token de escritura Vercel Blob |
 | `BLOB_STORE_ID` | ID del store de Blob |
+| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | reCAPTCHA (cliente) — requerido en producción |
+| `RECAPTCHA_SECRET_KEY` | reCAPTCHA (servidor) — requerido en producción |
+| `CONTACT_TEST_MODE` | `true` en local para omitir reCAPTCHA en la API |
+| `NEXT_PUBLIC_CONTACT_TEST_MODE` | `true` en local para omitir reCAPTCHA en el cliente |
+| `SEND_CONTACT_EMAIL` | `true` para enviar notificación por email al recibir un mensaje |
+| `RESEND_API_KEY` | API key de Resend (solo si `SEND_CONTACT_EMAIL=true`) |
+| `ADMIN_EMAIL` | Destinatario de notificaciones por email |
 
 3. Aplicar migraciones y cargar datos iniciales:
 
@@ -99,6 +105,17 @@ bun dev
 
 - Landing: [http://localhost:3000](http://localhost:3000)
 - Admin: [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
+
+### Desarrollo local sin reCAPTCHA
+
+Para probar el formulario de contacto sin claves de Google, activa ambas variables:
+
+```env
+CONTACT_TEST_MODE=true
+NEXT_PUBLIC_CONTACT_TEST_MODE=true
+```
+
+En producción no configures estas variables (o déjalas en `false`) y asegúrate de tener las claves de reCAPTCHA.
 
 ## Scripts
 
@@ -121,6 +138,7 @@ bun dev
 
 ## Notas
 
+- **Formulario de contacto:** los mensajes se guardan en la tabla `contact_messages` de Turso. El envío por email con Resend está desactivado por defecto; actívalo con `SEND_CONTACT_EMAIL=true`.
 - **Autenticación admin:** `ADMIN_ACCESS_CODE` permite el primer acceso cuando aún no hay código en la base de datos. Tras guardar un código en `/admin/settings`, el login valida exclusivamente contra Turso y la variable de entorno deja de usarse.
-- Turbopack está deshabilitado por incompatibilidad con el SDK de Resend; el proyecto usa el compilador estándar de Next.js.
+- Resend está externalizado en `next.config.ts` (`serverExternalPackages`) para compatibilidad con el bundler de Next.js en desarrollo.
 - El contenido editable vive en Turso. Si la BD está vacía o no configurada, la landing muestra los valores por defecto definidos en `lib/content-defaults.ts`.
