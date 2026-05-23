@@ -1,0 +1,9 @@
+{
+  "name": "kva-landing",
+  "mode": "vendored",
+  "dependencies": {
+    "tessl-labs/drizzle-best-practices": {
+      "version": "0.2.2"
+    }
+  }
+}

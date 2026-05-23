@@ -1,0 +1,6 @@
+{"sessionId":"07b24f","location":"app/admin/login/layout.tsx","message":"login layout render start","data":{"hypothesisId":"H2","route":"login"},"timestamp":1779558445922,"runId":"pre-fix"}
+{"sessionId":"07b24f","location":"lib/admin-auth.ts:isAdminAuthenticated","message":"isAdminAuthenticated called","data":{"hypothesisId":"H3","hasSession":false,"sessionLength":0},"timestamp":1779558445980,"runId":"pre-fix"}
+{"sessionId":"07b24f","location":"app/api/admin/auth/route.ts:POST","message":"auth POST handler start","data":{"hypothesisId":"H4"},"timestamp":1779558446309,"runId":"pre-fix"}
+{"sessionId":"07b24f","location":"lib/admin-auth.ts:verifyAccessCode","message":"verifyAccessCode called","data":{"hypothesisId":"H1","hasExpected":true,"expectedLength":14,"codeLength":14},"timestamp":1779558446311,"runId":"pre-fix"}
+{"sessionId":"07b24f","location":"app/admin/(protected)/layout.tsx","message":"protected layout render start","data":{"hypothesisId":"H2","route":"protected"},"timestamp":1779558446475,"runId":"pre-fix"}
+{"sessionId":"07b24f","location":"lib/admin-auth.ts:isAdminAuthenticated","message":"isAdminAuthenticated called","data":{"hypothesisId":"H3","hasSession":true,"sessionLength":64},"timestamp":1779558446497,"runId":"pre-fix"}
