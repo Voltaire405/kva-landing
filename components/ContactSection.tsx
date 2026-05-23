@@ -3,7 +3,14 @@
 import { FormEvent, useState } from 'react';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
-export default function ContactSection() {
+import ContactInfoDisplay from '@/components/ContactInfo';
+import type { ContactInfo } from '@/db/schema';
+
+interface ContactSectionProps {
+  contactInfo: ContactInfo;
+}
+
+export default function ContactSection({ contactInfo }: ContactSectionProps) {
   const { executeRecaptcha } = useGoogleReCaptcha();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{
@@ -18,7 +25,6 @@ export default function ContactSection() {
 
     const form = e.currentTarget;
 
-    // Verificar que reCAPTCHA esté disponible
     if (!executeRecaptcha) {
       setSubmitStatus({
         type: 'error',
@@ -29,7 +35,6 @@ export default function ContactSection() {
     }
 
     try {
-      // Obtener token de reCAPTCHA
       const recaptchaToken = await executeRecaptcha('contact_form');
 
       const formData = new FormData(form);
@@ -70,6 +75,7 @@ export default function ContactSection() {
         type: 'error',
         message: `Error de conexión: ${err instanceof Error ? err.message : 'Por favor verifica tu conexión a internet e intenta nuevamente.'}`,
       });
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -81,39 +87,8 @@ export default function ContactSection() {
           Contáctanos
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10 lg:gap-[50px] mt-10 sm:mt-12 md:mt-[60px]">
-          {/* Contact Info */}
-          <div className="flex flex-col justify-center">
-            <div className="flex items-center mb-5 sm:mb-6 md:mb-[25px]">
-              <div className="text-xl sm:text-2xl text-primary mr-3 sm:mr-[15px] bg-gray-medium w-[45px] h-[45px] sm:w-[50px] sm:h-[50px] rounded-full flex items-center justify-center flex-shrink-0">
-                <i className="material-icons">phone</i>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm sm:text-base">Teléfonos</h3>
-                <p className="text-sm sm:text-base">324 385 8798</p>
-                <p className="text-sm sm:text-base">304 203 2012</p>
-              </div>
-            </div>
-            <div className="flex items-center mb-5 sm:mb-6 md:mb-[25px]">
-              <div className="text-xl sm:text-2xl text-primary mr-3 sm:mr-[15px] bg-gray-medium w-[45px] h-[45px] sm:w-[50px] sm:h-[50px] rounded-full flex items-center justify-center flex-shrink-0">
-                <i className="material-icons">email</i>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm sm:text-base">Email</h3>
-                <p className="text-sm sm:text-base break-all">kvatelsoluciones@gmail.com</p>
-              </div>
-            </div>
-            <div className="flex items-center mb-5 sm:mb-6 md:mb-[25px]">
-              <div className="text-xl sm:text-2xl text-primary mr-3 sm:mr-[15px] bg-gray-medium w-[45px] h-[45px] sm:w-[50px] sm:h-[50px] rounded-full flex items-center justify-center flex-shrink-0">
-                <i className="material-icons">location_on</i>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm sm:text-base">Dirección</h3>
-                <p className="text-sm sm:text-base">Calle Principal #123, Ciudad</p>
-              </div>
-            </div>
-          </div>
+          <ContactInfoDisplay contactInfo={contactInfo} />
 
-          {/* Contact Form */}
           <div className="bg-gray-light p-5 sm:p-6 md:p-[30px] rounded-[10px] shadow-[0_5px_15px_rgba(0,0,0,0.05)]">
             {submitStatus.type && (
               <div
@@ -182,11 +157,21 @@ export default function ContactSection() {
               </button>
               <p className="text-xs text-gray-500 mt-4">
                 Este sitio está protegido por reCAPTCHA y se aplican la{' '}
-                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                <a
+                  href="https://policies.google.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
                   Política de privacidad
                 </a>{' '}
                 y los{' '}
-                <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                <a
+                  href="https://policies.google.com/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
                   Términos de servicio
                 </a>{' '}
                 de Google.

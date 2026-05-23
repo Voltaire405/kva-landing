@@ -1,12 +1,14 @@
 import Image from 'next/image';
 
+import type { PortfolioItem } from '@/db/schema';
+
 interface PortfolioItemProps {
   image: string;
   title: string;
   description: string;
 }
 
-function PortfolioItem({ image, title, description }: PortfolioItemProps) {
+function PortfolioCard({ image, title, description }: PortfolioItemProps) {
   return (
     <div className="relative rounded-[10px] overflow-hidden shadow-[0_5px_15px_rgba(0,0,0,0.1)] transition-all duration-300 h-[200px] sm:h-[220px] md:h-[250px] group hover:scale-[1.03] hover:shadow-[0_10px_25px_rgba(0,0,0,0.15)]">
       <Image
@@ -23,30 +25,11 @@ function PortfolioItem({ image, title, description }: PortfolioItemProps) {
   );
 }
 
-export default function Portfolio() {
-  const portfolioItems = [
-    {
-      image: 'https://sfile.chatglm.cn/images-ppt/971ace48ce9a.jpg',
-      title: 'Instalación Eléctrica Industrial',
-      description: 'Proyecto completo para planta de manufactura',
-    },
-    {
-      image: 'https://sfile.chatglm.cn/images-ppt/17f0a54b1b55.jpg',
-      title: 'Mantenimiento Eléctrico Comercial',
-      description: 'Actualización de sistema eléctrico en centro comercial',
-    },
-    {
-      image: 'https://sfile.chatglm.cn/images-ppt/f0bcaaf5d0e6.jpg',
-      title: 'Red de Datos Empresarial',
-      description: 'Implementación de red estructurada para corporativo',
-    },
-    {
-      image: 'https://sfile.chatglm.cn/images-ppt/e169658367d4.jpg',
-      title: 'Instalación de Fibra Óptica',
-      description: 'Conectividad de alta velocidad para edificio de oficinas',
-    },
-  ];
+interface PortfolioProps {
+  portfolioItems: PortfolioItem[];
+}
 
+export default function Portfolio({ portfolioItems }: PortfolioProps) {
   return (
     <section id="portafolio" className="py-12 sm:py-16 md:py-20 bg-gray-light">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-5">
@@ -54,8 +37,13 @@ export default function Portfolio() {
           Nuestros Trabajos
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 md:gap-[25px] mt-10 sm:mt-12 md:mt-[60px]">
-          {portfolioItems.map((item, index) => (
-            <PortfolioItem key={index} {...item} />
+          {portfolioItems.map((item) => (
+            <PortfolioCard
+              key={item.id}
+              image={item.imageUrl}
+              title={item.title}
+              description={item.description}
+            />
           ))}
         </div>
       </div>

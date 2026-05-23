@@ -1,3 +1,5 @@
+import type { Client } from '@/db/schema';
+
 interface ClientItemProps {
   name: string;
 }
@@ -10,15 +12,11 @@ function ClientItem({ name }: ClientItemProps) {
   );
 }
 
-export default function Clients() {
-  const clients = [
-    'Industria Alimentaria S.A.',
-    'Constructora del Norte',
-    'Hospital Central',
-    'Tecnologías Avanzadas Ltda.',
-    'Centro Comercial Plaza Mayor',
-  ];
+interface ClientsProps {
+  clients: Client[];
+}
 
+export default function Clients({ clients }: ClientsProps) {
   return (
     <section id="clientes" className="py-12 sm:py-16 md:py-20 bg-white">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-5">
@@ -26,8 +24,8 @@ export default function Clients() {
           Nuestros Clientes
         </h2>
         <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 md:gap-10 mt-10 sm:mt-12 md:mt-[60px]">
-          {clients.map((client, index) => (
-            <ClientItem key={index} name={client} />
+          {clients.map((client) => (
+            <ClientItem key={client.id} name={client.name} />
           ))}
         </div>
       </div>
