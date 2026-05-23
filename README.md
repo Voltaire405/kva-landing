@@ -24,7 +24,7 @@ Landing page corporativa de **KvaTel Soluciones** — instalaciones eléctricas 
 **Panel de administración** (`/admin`)
 
 - Acceso exclusivo por URL (sin enlaces en la landing)
-- Autenticación mediante código definido en `.env`
+- Autenticación mediante código de acceso (bootstrap vía `.env`, persistido en Turso desde Configuración)
 - CRUD de servicios, trabajos, clientes, testimonios e información de contacto
 - Subida de imágenes del portafolio a Vercel Blob
 
@@ -78,7 +78,7 @@ Completar todas las variables en `.env.local`:
 | `ADMIN_EMAIL` | Destinatario de mensajes de contacto |
 | `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | reCAPTCHA (cliente) |
 | `RECAPTCHA_SECRET_KEY` | reCAPTCHA (servidor) |
-| `ADMIN_ACCESS_CODE` | Código de acceso al panel `/admin` |
+| `ADMIN_ACCESS_CODE` | Código de acceso bootstrap al panel `/admin` (solo hasta guardar uno nuevo en Configuración) |
 | `TURSO_DATABASE_URL` | URL de la base Turso |
 | `TURSO_AUTH_TOKEN` | Token de autenticación Turso |
 | `BLOB_READ_WRITE_TOKEN` | Token de escritura Vercel Blob |
@@ -121,5 +121,6 @@ bun dev
 
 ## Notas
 
+- **Autenticación admin:** `ADMIN_ACCESS_CODE` permite el primer acceso cuando aún no hay código en la base de datos. Tras guardar un código en `/admin/settings`, el login valida exclusivamente contra Turso y la variable de entorno deja de usarse.
 - Turbopack está deshabilitado por incompatibilidad con el SDK de Resend; el proyecto usa el compilador estándar de Next.js.
 - El contenido editable vive en Turso. Si la BD está vacía o no configurada, la landing muestra los valores por defecto definidos en `lib/content-defaults.ts`.

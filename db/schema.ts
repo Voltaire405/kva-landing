@@ -89,6 +89,15 @@ export const contactInfo = sqliteTable('contact_info', {
     .notNull(),
 });
 
+export const adminSettings = sqliteTable('admin_settings', {
+  id: integer('id').primaryKey(),
+  accessCodeHash: text('access_code_hash').notNull(),
+  sessionSecret: text('session_secret').notNull(),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+});
+
 export type Service = typeof services.$inferSelect;
 export type NewService = typeof services.$inferInsert;
 export type PortfolioItem = typeof portfolioItems.$inferSelect;
@@ -98,3 +107,4 @@ export type NewClient = typeof clients.$inferInsert;
 export type Testimonial = typeof testimonials.$inferSelect;
 export type NewTestimonial = typeof testimonials.$inferInsert;
 export type ContactInfo = typeof contactInfo.$inferSelect;
+export type AdminSettings = typeof adminSettings.$inferSelect;

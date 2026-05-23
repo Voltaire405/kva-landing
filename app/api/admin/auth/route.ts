@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const code = typeof body.code === 'string' ? body.code.trim() : '';
 
-    if (!code || !verifyAccessCode(code)) {
+    if (!code || !(await verifyAccessCode(code))) {
       return NextResponse.json({ error: 'Código inválido' }, { status: 401 });
     }
 

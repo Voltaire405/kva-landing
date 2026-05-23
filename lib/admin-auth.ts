@@ -2,35 +2,24 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
+import {
+  persistAccessCode,
+  resolveSessionSecret,
+  verifyAccessCode,
+} from '@/lib/admin-settings';
+
 export const ADMIN_SESSION_COOKIE = 'admin_session';
 
-function getAccessCode(): string {
-  const code = process.env.ADMIN_ACCESS_CODE;
-  if (!code) {
-    throw new Error('ADMIN_ACCESS_CODE is not configured');
-  }
-  return code;
+async function createSessionToken(): Promise<string> {
+  const secret = await resolveSessionSecret();
+  return createHmac('sha256', secret).update('admin-session').digest('hex');
 }
 
-function createSessionToken(): string {
-  return createHmac('sha256', getAccessCode()).update('admin-session').digest('hex');
-}
-
-export function verifyAccessCode(code: string): boolean {
-  const expected = getAccessCode();
-  const provided = Buffer.from(code);
-  const expectedBuffer = Buffer.from(expected);
-
-  if (provided.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(provided, expectedBuffer);
-}
+export { verifyAccessCode } from '@/lib/admin-settings';
 
 export async function createSessionCookie() {
   const cookieStore = await cookies();
-  cookieStore.set(ADMIN_SESSION_COOKIE, createSessionToken(), {
+  cookieStore.set(ADMIN_SESSION_COOKIE, await createSessionToken(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -53,7 +42,7 @@ export async function isAdminAuthenticated(): Promise<boolean> {
   }
 
   try {
-    const expected = createSessionToken();
+    const expected = await createSessionToken();
     const sessionBuffer = Buffer.from(session);
     const expectedBuffer = Buffer.from(expected);
 
@@ -75,4 +64,23 @@ export async function requireAdminSession() {
   }
 
   return null;
+}
+
+export async function updateAccessCode({
+  currentCode,
+  newCode,
+}: {
+  currentCode: string;
+  newCode: string;
+}): Promise<{ success: true } | { success: false; error: string; status: number }> {
+  const currentValid = await verifyAccessCode(currentCode);
+
+  if (!currentValid) {
+    return { success: false, error: 'Código actual incorrecto', status: 401 };
+  }
+
+  await persistAccessCode(newCode);
+  await clearSessionCookie();
+
+  return { success: true };
 }

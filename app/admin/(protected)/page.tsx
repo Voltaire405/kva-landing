@@ -28,6 +28,11 @@ const sections = [
     title: 'Contacto',
     description: 'Teléfono, email y dirección.',
   },
+  {
+    href: '/admin/settings',
+    title: 'Configuración',
+    description: 'Código de acceso al panel de administración.',
+  },
 ];
 
 export default function AdminDashboardPage() {

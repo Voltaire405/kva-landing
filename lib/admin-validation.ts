@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-strength';
+
 export function parseId(value: string): number | null {
   const id = Number(value);
   return Number.isInteger(id) && id > 0 ? id : null;
@@ -41,4 +43,20 @@ export function validateEmail(value: unknown): string | NextResponse {
 export function validateSortOrder(value: unknown): number {
   const sortOrder = Number(value);
   return Number.isInteger(sortOrder) && sortOrder >= 0 ? sortOrder : 0;
+}
+
+export function validateAccessCode(value: unknown): string | NextResponse {
+  const code = validateRequiredString(value, 'code', 128);
+  if (code instanceof NextResponse) {
+    return code;
+  }
+
+  if (code.length < PASSWORD_MIN_LENGTH) {
+    return NextResponse.json(
+      { error: `El código debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres` },
+      { status: 400 }
+    );
+  }
+
+  return code;
 }
