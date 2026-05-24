@@ -79,6 +79,27 @@ export function isValidEmailFormat(email: string): boolean {
   return true;
 }
 
+export const DISPOSABLE_DOMAINS = [
+  'mailinator.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'temp-mail.org',
+  'dispostable.com',
+  'yopmail.com',
+] as const;
+
+export function isDisposableEmail(email: string): boolean {
+  const normalized = normalizeEmail(email);
+
+  if (!isValidEmailFormat(normalized)) {
+    return false;
+  }
+
+  const atIndex = normalized.lastIndexOf('@');
+  const domain = normalized.slice(atIndex + 1);
+  return (DISPOSABLE_DOMAINS as readonly string[]).includes(domain);
+}
+
 export function validateEmail(value: unknown): string | NextResponse {
   const email = validateRequiredString(value, 'email', 254);
   if (email instanceof NextResponse) {
@@ -89,6 +110,28 @@ export function validateEmail(value: unknown): string | NextResponse {
 
   if (!isValidEmailFormat(normalized)) {
     return NextResponse.json({ error: 'Email inválido' }, { status: 400 });
+  }
+
+  return normalized;
+}
+
+export function validateContactEmail(value: unknown): string | NextResponse {
+  const email = validateRequiredString(value, 'email', 254);
+  if (email instanceof NextResponse) {
+    return email;
+  }
+
+  const normalized = normalizeEmail(email);
+
+  if (!isValidEmailFormat(normalized)) {
+    return NextResponse.json({ error: 'El formato del email no es válido' }, { status: 400 });
+  }
+
+  if (isDisposableEmail(normalized)) {
+    return NextResponse.json(
+      { error: 'No se permiten correos de dominios temporales' },
+      { status: 400 }
+    );
   }
 
   return normalized;

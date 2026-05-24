@@ -4,7 +4,7 @@ import { createContactMessage, markContactMessagesNotified } from '@/lib/content
 import { sendContactNotificationEmail } from '@/lib/contact-email';
 import { isContactDailyLimitReached } from '@/lib/contact-daily-limit';
 import { validateContactSpam } from '@/lib/contact-spam-guard';
-import { isValidEmailFormat, normalizeEmail } from '@/lib/admin-validation';
+import { validateContactEmail } from '@/lib/admin-validation';
 import { checkRateLimit, getClientIP } from '@/lib/rate-limiter';
 
 const FAKE_SUCCESS_RESPONSE = {
@@ -71,14 +71,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedEmail = normalizeEmail(email);
-    if (!isValidEmailFormat(normalizedEmail)) {
-      return NextResponse.json({ error: 'El formato del email no es válido' }, { status: 400 });
-    }
+    const validatedEmail = validateContactEmail(email);
+    if (validatedEmail instanceof NextResponse) return validatedEmail;
 
     const saved = await createContactMessage({
       name: name.trim(),
-      email: normalizedEmail,
+      email: validatedEmail,
       phone: phone?.trim() || null,
       message: message.trim(),
     });
