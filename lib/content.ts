@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 
 import { db } from '@/db';
@@ -7,6 +7,7 @@ import {
   clients,
   contactInfo,
   contactMessages,
+  notificationSettings,
   portfolioItems,
   services,
   testimonials,
@@ -289,4 +290,48 @@ export async function listContactMessages() {
 
 export async function deleteContactMessage(id: number) {
   await db.delete(contactMessages).where(eq(contactMessages.id, id));
+}
+
+const NOTIFICATION_SETTINGS_ID = 1;
+
+export async function updateLastNotificationAt(timestamp: string): Promise<void> {
+  const now = new Date().toISOString();
+  const [existing] = await db
+    .select()
+    .from(notificationSettings)
+    .where(eq(notificationSettings.id, NOTIFICATION_SETTINGS_ID))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(notificationSettings)
+      .set({ lastNotificationAt: timestamp, updatedAt: now })
+      .where(eq(notificationSettings.id, NOTIFICATION_SETTINGS_ID));
+    return;
+  }
+
+  await db.insert(notificationSettings).values({
+    id: NOTIFICATION_SETTINGS_ID,
+    scheduledEnabled: 0,
+    scheduleHours: '[0,12]',
+    lastNotificationAt: timestamp,
+    updatedAt: now,
+  });
+}
+
+export async function listUnnotifiedContactMessages() {
+  return db
+    .select()
+    .from(contactMessages)
+    .where(eq(contactMessages.notified, 0))
+    .orderBy(asc(contactMessages.createdAt));
+}
+
+export async function markContactMessagesNotified(ids: number[]) {
+  if (ids.length === 0) return;
+
+  await db
+    .update(contactMessages)
+    .set({ notified: 1 })
+    .where(inArray(contactMessages.id, ids));
 }

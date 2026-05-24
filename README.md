@@ -10,7 +10,7 @@ Landing page corporativa de **KvaTel Soluciones** — instalaciones eléctricas 
 | UI | React 19, Tailwind CSS 4 |
 | Base de datos | Turso (SQLite) + Drizzle ORM |
 | Imágenes | Vercel Blob |
-| Email | Resend (opcional — notificación por correo) |
+| Email | Resend (opcional — inmediato o lote programado vía Vercel Cron) |
 | Anti-spam | Google reCAPTCHA v3 (omitible en modo test local) |
 
 ## Funcionalidades
@@ -27,6 +27,7 @@ Landing page corporativa de **KvaTel Soluciones** — instalaciones eléctricas 
 - Autenticación mediante código de acceso (bootstrap vía `.env`, persistido en Turso desde Configuración)
 - CRUD de servicios, trabajos, clientes, testimonios e información de contacto
 - Bandeja de mensajes recibidos del formulario (`/admin/messages`): listado, lectura y eliminación
+- Notificaciones por correo en lote cada hora (`CONTACT_EMAIL_CRON_ENABLED=true`)
 - Subida de imágenes del portafolio a Vercel Blob
 
 ## Estructura del proyecto
@@ -37,6 +38,7 @@ app/
   admin/                   # Panel de administración
   api/
     contact/               # Envío del formulario → Turso (email opcional)
+    cron/notifications/    # Cron Vercel — resumen en lote de mensajes
     admin/                 # API CRUD + auth + upload + messages
 components/                # Secciones de la landing y UI del admin
 db/
@@ -45,7 +47,8 @@ db/
 lib/
   content.ts               # Queries de contenido y mensajes de contacto
   admin-auth.ts            # Sesión del panel
-  contact-test-mode.ts     # Bypass de reCAPTCHA en desarrollo
+  contact-email.ts         # Plantillas y envío Resend (individual y lote)
+  notification-schedule.ts # Zona horaria America/Bogota (plantillas de email)
 drizzle/                   # Migraciones generadas
 ```
 
@@ -86,9 +89,11 @@ Completar todas las variables en `.env.local`:
 | `RECAPTCHA_SECRET_KEY` | reCAPTCHA (servidor) — requerido en producción |
 | `CONTACT_TEST_MODE` | `true` en local para omitir reCAPTCHA en la API |
 | `NEXT_PUBLIC_CONTACT_TEST_MODE` | `true` en local para omitir reCAPTCHA en el cliente |
-| `SEND_CONTACT_EMAIL` | `true` para enviar notificación por email al recibir un mensaje |
-| `RESEND_API_KEY` | API key de Resend (solo si `SEND_CONTACT_EMAIL=true`) |
-| `ADMIN_EMAIL` | Destinatario de notificaciones por email |
+| `SEND_CONTACT_EMAIL` | `true` para enviar notificación inmediata por email al recibir un mensaje (anula el cron) |
+| `CONTACT_EMAIL_CRON_ENABLED` | `true` para resumen en lote cada hora vía Vercel Cron |
+| `RESEND_API_KEY` | API key de Resend (inmediato y/o lote programado) |
+| `RESEND_FROM_EMAIL` | Remitente (opcional; default `Formulario KvaTel <onboarding@resend.dev>`) |
+| `CRON_SECRET` | Secreto para autenticar el cron (Vercel lo inyecta en producción; definir en local para pruebas) |
 
 3. Aplicar migraciones y cargar datos iniciales:
 
@@ -135,10 +140,14 @@ En producción no configures estas variables (o déjalas en `false`) y asegúrat
 2. Configurar las mismas variables de entorno que en `.env.example`.
 3. Tras el primer deploy, ejecutar `db:migrate` y `db:seed` contra la base Turso de producción.
 4. El panel admin queda disponible en `https://tu-dominio.vercel.app/admin/login`.
+5. Configura `RESEND_API_KEY`, `CONTACT_EMAIL_CRON_ENABLED=true` (o `SEND_CONTACT_EMAIL=true` para modo inmediato) y verifica que el email de contacto en `/admin/contact` sea válido. El cron en `vercel.json` se ejecuta cada hora (`0 * * * *`).
 
 ## Notas
 
-- **Formulario de contacto:** los mensajes se guardan en la tabla `contact_messages` de Turso. El envío por email con Resend está desactivado por defecto; actívalo con `SEND_CONTACT_EMAIL=true`.
+- **Formulario de contacto:** los mensajes se guardan en la tabla `contact_messages` de Turso. Modos de email con Resend:
+  - **Inmediato:** `SEND_CONTACT_EMAIL=true` — un correo por mensaje; el cron no procesa.
+  - **Lote horario:** `CONTACT_EMAIL_CRON_ENABLED=true` — resumen cada hora si hay mensajes nuevos. Destinatario: email en `/admin/contact`.
+  - **Ninguno:** sin esas variables — solo Turso y panel admin.
 - **Autenticación admin:** `ADMIN_ACCESS_CODE` permite el primer acceso cuando aún no hay código en la base de datos. Tras guardar un código en `/admin/settings`, el login valida exclusivamente contra Turso y la variable de entorno deja de usarse.
 - Resend está externalizado en `next.config.ts` (`serverExternalPackages`) para compatibilidad con el bundler de Next.js en desarrollo.
 - El contenido editable vive en Turso. Si la BD está vacía o no configurada, la landing muestra los valores por defecto definidos en `lib/content-defaults.ts`.

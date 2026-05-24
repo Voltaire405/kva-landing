@@ -106,14 +106,26 @@ export const contactMessages = sqliteTable(
     email: text('email').notNull(),
     phone: text('phone'),
     message: text('message').notNull(),
+    notified: integer('notified').notNull().default(0),
     createdAt: text('created_at')
       .default(sql`(datetime('now'))`)
       .notNull(),
   },
   (table) => ({
     createdAtIdx: index('idx_contact_messages_created_at').on(table.createdAt),
+    notifiedIdx: index('idx_contact_messages_notified').on(table.notified),
   })
 );
+
+export const notificationSettings = sqliteTable('notification_settings', {
+  id: integer('id').primaryKey(),
+  scheduledEnabled: integer('scheduled_enabled').notNull().default(0),
+  scheduleHours: text('schedule_hours').notNull().default('[0,12]'),
+  lastNotificationAt: text('last_notification_at'),
+  updatedAt: text('updated_at')
+    .default(sql`(datetime('now'))`)
+    .notNull(),
+});
 
 export type Service = typeof services.$inferSelect;
 export type NewService = typeof services.$inferInsert;
@@ -127,3 +139,5 @@ export type ContactInfo = typeof contactInfo.$inferSelect;
 export type ContactMessage = typeof contactMessages.$inferSelect;
 export type NewContactMessage = typeof contactMessages.$inferInsert;
 export type AdminSettings = typeof adminSettings.$inferSelect;
+export type NotificationSettings = typeof notificationSettings.$inferSelect;
+export type NewNotificationSettings = typeof notificationSettings.$inferInsert;

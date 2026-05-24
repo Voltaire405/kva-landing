@@ -53,20 +53,50 @@ Este proyecto utiliza **Resend** con su SDK oficial para el envío de correos el
 2. Edita `.env.local` y actualiza los valores:
    ```env
    RESEND_API_KEY=re_tu_api_key_aqui
-   ADMIN_EMAIL=kvatelsoluciones@gmail.com
    NEXT_PUBLIC_RECAPTCHA_SITE_KEY=tu_site_key_aqui
    RECAPTCHA_SECRET_KEY=tu_secret_key_aqui
+   CRON_SECRET=un_secreto_largo_para_pruebas_locales
    ```
 
-### 5. Configurar en Vercel
+### 5. Notificaciones en lote (Vercel Cron)
+
+Además del envío inmediato (`SEND_CONTACT_EMAIL=true`), puedes activar un **resumen horario** con:
+
+```env
+CONTACT_EMAIL_CRON_ENABLED=true
+```
+
+| Modo | Variable | Comportamiento |
+|---|---|---|
+| Inmediato | `SEND_CONTACT_EMAIL=true` | Un correo por mensaje; el cron no procesa |
+| Lote horario | `CONTACT_EMAIL_CRON_ENABLED=true` | Resumen cada hora si hay mensajes nuevos |
+| Ninguno | (ninguna) | Solo Turso + panel admin |
+
+**Variables adicionales en Vercel:**
+
+- `CRON_SECRET`: Vercel lo genera e inyecta automáticamente en el header `Authorization` al invocar crons. En local, defínelo en `.env.local` para probar manualmente.
+- `RESEND_API_KEY`: requerida para el envío en lote e inmediato.
+- El destinatario se toma del **email de contacto** configurado en `/admin/contact` (tabla `contact_info` en Turso).
+
+**Cron en `vercel.json`:** se ejecuta **cada hora** (`0 * * * *`). Solo envía si hay mensajes sin notificar y el email de contacto es válido.
+
+**Probar el cron localmente:**
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/notifications
+```
+
+Respuestas posibles: `{ sent: true, count: N }`, `{ skipped: true, reason: "immediate_email_enabled" | "cron_disabled" | "invalid_recipient_email" | "no_messages" }`.
+
+### 6. Configurar en Vercel
 
 1. Ve a tu proyecto en [Vercel Dashboard](https://vercel.com/dashboard)
 2. Settings → Environment Variables
 3. Agrega las siguientes variables:
    - `RESEND_API_KEY`: Tu API key de Resend
-   - `ADMIN_EMAIL`: El email donde recibirás los mensajes (ej: kvatelsoluciones@gmail.com)
    - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`: Tu Site Key de reCAPTCHA
    - `RECAPTCHA_SECRET_KEY`: Tu Secret Key de reCAPTCHA
+   - `CRON_SECRET`: Secreto para el cron (Vercel puede generarlo automáticamente)
 4. Asegúrate de marcar las variables para: Production, Preview y Development
 5. Haz un nuevo deploy o espera al próximo push
 
@@ -83,18 +113,20 @@ Por defecto, los correos se envían desde `onboarding@resend.dev`. Para usar tu 
 3. Ingresa tu dominio (ej: `kvatel.com`)
 4. Sigue las instrucciones para agregar los registros DNS
 5. Espera la verificación (puede tardar hasta 48 horas)
-6. Actualiza el `from` en `app/api/contact/route.ts`:
-   ```typescript
-   from: 'Contacto KvaTel <noreply@kvatel.com>',
+6. Configura la variable de entorno `RESEND_FROM_EMAIL`:
+   ```env
+   RESEND_FROM_EMAIL=Contacto KvaTel <noreply@kvatel.com>
    ```
 
 ### Opción B: Usar subdominio de Resend (Gratis)
 
-Si no tienes un dominio propio, Resend te proporciona un subdominio gratuito `yourusername.resend.dev` que ya está verificado. Solo actualiza:
+Si no tienes un dominio propio, Resend te proporciona un subdominio gratuito `yourusername.resend.dev` que ya está verificado. Configura:
 
-```typescript
-from: 'Contacto KvaTel <contacto@tuusuario.resend.dev>',
+```env
+RESEND_FROM_EMAIL=Contacto KvaTel <contacto@tuusuario.resend.dev>
 ```
+
+Si no defines `RESEND_FROM_EMAIL`, se usa el fallback `Formulario KvaTel <onboarding@resend.dev>`.
 
 ## 🧪 Probar Localmente
 
