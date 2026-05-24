@@ -1,17 +1,19 @@
 # Configuración del Sistema de Envío de Correos
 
-Este proyecto utiliza **Resend** con su SDK oficial para el envío de correos electrónicos desde el formulario de contacto, protegido con **Google reCAPTCHA v3** y **rate limiting** para prevenir spam.
+Este proyecto utiliza **Resend** con su SDK oficial para el envío de correos electrónicos desde el formulario de contacto, protegido con **anti-spam ligero** (honeypot, tiempo mínimo de envío) y **rate limiting persistente** en Turso.
 
 > **Nota sobre Turbopack:** Turbopack ha sido deshabilitado tanto en desarrollo como en producción debido a incompatibilidades con el SDK de Resend. El proyecto usa el compilador estándar de Next.js que es completamente compatible.
 
-## 🛡️ Características de Seguridad
+## Características de Seguridad
 
-- ✅ **reCAPTCHA v3**: Protección invisible contra bots (score mínimo: 0.5)
-- ✅ **Rate Limiting**: Máximo 3 intentos por minuto por IP
-- ✅ **Validación de datos**: Email, nombre y mensaje requeridos
-- ✅ **Headers de seguridad**: X-RateLimit-Remaining y X-RateLimit-Reset
+- **Honeypot**: campo oculto (`website`) que solo rellenan bots; respuesta de éxito falso sin guardar
+- **Tiempo mínimo**: rechaza envíos en menos de 3 segundos desde que se carga el formulario
+- **Rate limiting**: máximo 3 intentos por IP cada 24 horas (persistido en Turso)
+- **Límite diario global**: máximo 50 mensajes guardados por día calendario (America/Bogota); configurable con `CONTACT_DAILY_MESSAGE_LIMIT`
+- **Validación de datos**: email, nombre y mensaje requeridos
+- **Headers de seguridad**: `X-RateLimit-Remaining` y `X-RateLimit-Reset`
 
-## 🚀 Pasos de Configuración
+## Pasos de Configuración
 
 ### 1. Crear cuenta en Resend
 
@@ -27,23 +29,7 @@ Este proyecto utiliza **Resend** con su SDK oficial para el envío de correos el
 4. Dale un nombre (ej: "KvaTel Production")
 5. Copia la API key (solo se muestra una vez)
 
-### 3. Configurar Google reCAPTCHA v3
-
-1. Ve a [https://www.google.com/recaptcha/admin](https://www.google.com/recaptcha/admin)
-2. Haz clic en **Crear**
-3. Configuración:
-   - **Etiqueta**: KvaTel Contact Form (o el nombre que prefieras)
-   - **Tipo de reCAPTCHA**: Selecciona **reCAPTCHA v3**
-   - **Dominios**: Agrega:
-     - `localhost` (para desarrollo)
-     - Tu dominio de producción (ej: `kvatel.com`)
-     - Tu dominio de Vercel (ej: `tu-proyecto.vercel.app`)
-4. Acepta los términos y haz clic en **Enviar**
-5. Copia las dos claves que aparecen:
-   - **Clave del sitio** (Site Key) - Para el frontend
-   - **Clave secreta** (Secret Key) - Para el backend
-
-### 4. Configurar Variables de Entorno Localmente
+### 3. Configurar Variables de Entorno Localmente
 
 1. Copia el archivo de ejemplo:
    ```bash
@@ -53,12 +39,13 @@ Este proyecto utiliza **Resend** con su SDK oficial para el envío de correos el
 2. Edita `.env.local` y actualiza los valores:
    ```env
    RESEND_API_KEY=re_tu_api_key_aqui
-   NEXT_PUBLIC_RECAPTCHA_SITE_KEY=tu_site_key_aqui
-   RECAPTCHA_SECRET_KEY=tu_secret_key_aqui
    CRON_SECRET=un_secreto_largo_para_pruebas_locales
+   CONTACT_TEST_MODE=true
    ```
 
-### 5. Notificaciones en lote (Vercel Cron)
+   `CONTACT_TEST_MODE=true` omite honeypot y tiempo mínimo en la API durante desarrollo local.
+
+### 4. Notificaciones en lote (Vercel Cron)
 
 Además del envío inmediato (`SEND_CONTACT_EMAIL=true`), puedes activar un **resumen horario** con:
 
@@ -88,21 +75,17 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/noti
 
 Respuestas posibles: `{ sent: true, count: N }`, `{ skipped: true, reason: "immediate_email_enabled" | "cron_disabled" | "invalid_recipient_email" | "no_messages" }`.
 
-### 6. Configurar en Vercel
+### 5. Configurar en Vercel
 
 1. Ve a tu proyecto en [Vercel Dashboard](https://vercel.com/dashboard)
 2. Settings → Environment Variables
 3. Agrega las siguientes variables:
    - `RESEND_API_KEY`: Tu API key de Resend
-   - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`: Tu Site Key de reCAPTCHA
-   - `RECAPTCHA_SECRET_KEY`: Tu Secret Key de reCAPTCHA
    - `CRON_SECRET`: Secreto para el cron (Vercel puede generarlo automáticamente)
 4. Asegúrate de marcar las variables para: Production, Preview y Development
 5. Haz un nuevo deploy o espera al próximo push
 
-> **Importante**: Las variables que comienzan con `NEXT_PUBLIC_` son visibles en el cliente, por eso es seguro usar la Site Key ahí. La Secret Key NUNCA debe exponerse al cliente.
-
-## 📧 Configuración de Dominio (Opcional pero Recomendado)
+## Configuración de Dominio (Opcional pero Recomendado)
 
 Por defecto, los correos se envían desde `onboarding@resend.dev`. Para usar tu propio dominio:
 
@@ -128,7 +111,7 @@ RESEND_FROM_EMAIL=Contacto KvaTel <contacto@tuusuario.resend.dev>
 
 Si no defines `RESEND_FROM_EMAIL`, se usa el fallback `Formulario KvaTel <onboarding@resend.dev>`.
 
-## 🧪 Probar Localmente
+## Probar Localmente
 
 1. Asegúrate de tener las variables de entorno en `.env.local`
 2. Inicia el servidor de desarrollo:
@@ -137,10 +120,10 @@ Si no defines `RESEND_FROM_EMAIL`, se usa el fallback `Formulario KvaTel <onboar
    ```
 3. Abre http://localhost:3000
 4. Ve a la sección de **Contáctanos**
-5. Llena el formulario y envía
+5. Llena el formulario y envía (con `CONTACT_TEST_MODE=true` no necesitas esperar 3 segundos)
 6. Verifica que el email llegue a tu bandeja de entrada
 
-## 📊 Monitoreo
+## Monitoreo
 
 Para ver el estado de tus emails enviados:
 
@@ -148,33 +131,41 @@ Para ver el estado de tus emails enviados:
 2. Ve a **Emails** en el menú lateral
 3. Aquí verás todos los emails enviados con su estado (Delivered, Bounced, etc.)
 
-## 🔒 Seguridad y Anti-Spam
+## Seguridad y Anti-Spam
 
 ### Protección Implementada
 
-1. **reCAPTCHA v3 (Invisible)**
-   - Score mínimo: 0.5 (configurable en `/app/api/contact/route.ts`)
-   - Sin interacción del usuario (completamente invisible)
-   - Tokens válidos por 2 minutos y uso único
+1. **Honeypot (`website`)**
+   - Campo oculto en el formulario; los bots suelen rellenarlo
+   - Si tiene valor: respuesta 200 de éxito falso, sin guardar en BD
+   - Configurable en [`lib/contact-spam-guard.ts`](lib/contact-spam-guard.ts)
 
-2. **Rate Limiting por IP**
-   - Límite: 3 intentos por minuto
-   - Se reinicia automáticamente después de 1 minuto
+2. **Tiempo mínimo de envío**
+   - El cliente envía `formLoadedAt` al montar el formulario
+   - Envíos en menos de 3 segundos se tratan como bot (éxito falso)
+   - Ajustable con `MIN_FORM_SUBMIT_MS` en [`lib/contact-spam-guard.ts`](lib/contact-spam-guard.ts)
+
+3. **Rate limiting por IP**
+   - Límite: 3 intentos cada 24 horas
+   - Persistido en tabla `contact_rate_limits` de Turso
    - Headers informativos: `X-RateLimit-Remaining` y `X-RateLimit-Reset`
-   - Almacenamiento en memoria (se reinicia con cold starts de serverless)
 
-3. **Validaciones del Servidor**
+4. **Límite diario global**
+   - Default: 50 mensajes guardados por día (calendario America/Bogota)
+   - Solo cuenta mensajes persistidos en `contact_messages` (bots rechazados no consumen cupo)
+   - Al alcanzarlo: HTTP 503 con mensaje genérico al usuario
+   - Configurable con `CONTACT_DAILY_MESSAGE_LIMIT` (omitido con `CONTACT_TEST_MODE=true`)
+
+5. **Validaciones del servidor**
    - Campos requeridos: nombre, email, mensaje
    - Formato de email válido
-   - Token de reCAPTCHA válido
 
-4. **Mejores Prácticas**
-   - ✅ Las API keys están en `.env.local` (ignorado por git)
-   - ✅ Secret keys nunca se exponen al cliente
-   - ✅ Logging detallado de intentos sospechosos
-   - ✅ Mensajes de error informativos pero seguros
+6. **Mejores prácticas**
+   - Las API keys están en `.env.local` (ignorado por git)
+   - Logging de intentos sospechosos (`Contact spam rejected`)
+   - Mensajes de error informativos pero seguros
 
-## 🆘 Solución de Problemas
+## Solución de Problemas
 
 ### El formulario no envía emails
 
@@ -195,26 +186,26 @@ Para ver el estado de tus emails enviados:
 2. Asegúrate de que la variable se llame exactamente `RESEND_API_KEY`
 3. Si estás en Vercel, verifica que la variable esté en el environment correcto
 
-### Error "Token de CAPTCHA no proporcionado" o score bajo
-
-1. Verifica que las keys de reCAPTCHA estén configuradas correctamente
-2. Asegúrate de usar reCAPTCHA v3, NO v2
-3. Verifica que el dominio esté agregado en la consola de reCAPTCHA
-4. Si el score es muy bajo (<0.5), puede ser:
-   - Navegación en modo incógnito
-   - VPN o proxy activo
-   - Comportamiento sospechoso del usuario
-   - Puedes ajustar el umbral en `RECAPTCHA_THRESHOLD` en la API
-
 ### Error "Demasiados intentos"
 
-1. Esto es normal - es el rate limiting funcionando
-2. Espera 1 minuto antes de intentar nuevamente
-3. Si necesitas cambiar el límite, edita `/lib/rate-limiter.ts`:
-   - `MAX_REQUESTS_PER_WINDOW`: Número de intentos
-   - `RATE_LIMIT_WINDOW`: Ventana de tiempo en ms
+1. Es el rate limiting funcionando (3 envíos por IP cada 24 h)
+2. Espera a que expire la ventana o ajusta los límites en [`lib/rate-limiter.ts`](lib/rate-limiter.ts):
+   - `MAX_REQUESTS_PER_WINDOW`: número de intentos
+   - `RATE_LIMIT_WINDOW`: ventana de tiempo en ms
 
-## 📝 Límites del Plan Gratuito
+### Error "No podemos recibir más mensajes hoy"
+
+1. Se alcanzó el límite diario global del formulario
+2. El contador se reinicia al día siguiente (America/Bogota)
+3. Ajusta `CONTACT_DAILY_MESSAGE_LIMIT` en Vercel si necesitas más capacidad (default: 50)
+
+### El formulario parece enviarse pero no aparece en admin
+
+1. Puede ser un bot detectado (honeypot o tiempo mínimo): revisa logs del servidor
+2. En producción, espera al menos 3 segundos antes de enviar
+3. No rellenes el campo oculto del formulario
+
+## Límites del Plan Gratuito
 
 ### Resend
 - 100 correos por día
@@ -224,33 +215,37 @@ Para ver el estado de tus emails enviados:
 
 Si necesitas más, considera [actualizar el plan](https://resend.com/pricing).
 
-### Google reCAPTCHA
-- 1,000,000 de evaluaciones por mes (gratis)
-- Más que suficiente para la mayoría de sitios web
+## Ajustes Recomendados
 
-## 🎯 Ajustes Recomendados
+### Anti-spam
 
-### Configuración de Score de reCAPTCHA
-
-Edita `/app/api/contact/route.ts` para ajustar el umbral:
+Edita [`lib/contact-spam-guard.ts`](lib/contact-spam-guard.ts):
 
 ```typescript
-const RECAPTCHA_THRESHOLD = 0.5; // Cambia este valor según necesites
+export const MIN_FORM_SUBMIT_MS = 3000; // milisegundos mínimos antes de enviar
 ```
 
-- **0.0-0.3**: Muy probable que sea un bot
-- **0.3-0.5**: Sospechoso
-- **0.5-0.7**: Neutral (recomendado)
-- **0.7-0.9**: Probablemente humano
-- **0.9-1.0**: Muy probablemente humano
+### Rate limiting
 
-### Configuración de Rate Limiting
-
-Edita `/lib/rate-limiter.ts`:
+Edita [`lib/rate-limiter.ts`](lib/rate-limiter.ts):
 
 ```typescript
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minuto (en ms)
-const MAX_REQUESTS_PER_WINDOW = 3; // intentos por ventana
+export const RATE_LIMIT_WINDOW = 24 * 60 * 60 * 1000; // 24 horas (en ms)
+export const MAX_REQUESTS_PER_WINDOW = 3; // intentos por ventana
+```
+
+### Límite diario global
+
+Variable de entorno (recomendado):
+
+```env
+CONTACT_DAILY_MESSAGE_LIMIT=50
+```
+
+O edita el default en [`lib/contact-daily-limit.ts`](lib/contact-daily-limit.ts):
+
+```typescript
+export const DEFAULT_CONTACT_DAILY_MESSAGE_LIMIT = 50;
 ```
 
 Ajusta según tus necesidades y tráfico esperado.

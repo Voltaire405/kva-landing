@@ -117,6 +117,12 @@ export const contactMessages = sqliteTable(
   })
 );
 
+export const contactRateLimits = sqliteTable('contact_rate_limits', {
+  identifier: text('identifier').primaryKey(),
+  count: integer('count').notNull().default(0),
+  resetAt: integer('reset_at').notNull(),
+});
+
 export const notificationSettings = sqliteTable('notification_settings', {
   id: integer('id').primaryKey(),
   scheduledEnabled: integer('scheduled_enabled').notNull().default(0),

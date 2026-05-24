@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Montserrat, Roboto } from "next/font/google";
-import RecaptchaProvider from '@/components/RecaptchaProvider';
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -33,9 +32,7 @@ export default function RootLayout({
       <body
         className={`${montserrat.variable} ${roboto.variable} antialiased`}
       >
-        <RecaptchaProvider>
-          {children}
-        </RecaptchaProvider>
+        {children}
       </body>
     </html>
   );

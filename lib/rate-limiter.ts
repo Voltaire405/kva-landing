@@ -1,52 +1,32 @@
-// Sistema de rate limiting simple para serverless
-// Almacena intentos en memoria (reinicia con cada cold start)
+import { eq } from 'drizzle-orm';
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
+import { db } from '@/db';
+import { contactRateLimits } from '@/db/schema';
 
-// Map para almacenar intentos por IP
-const rateLimitStore = new Map<string, RateLimitEntry>();
+export const RATE_LIMIT_WINDOW = 24 * 60 * 60 * 1000;
+export const MAX_REQUESTS_PER_WINDOW = 3;
 
-// Configuración
-const RATE_LIMIT_WINDOW = 24 * 60 * 60 * 1000; // 24 horas
-const MAX_REQUESTS_PER_WINDOW = 3; // 3 intentos cada 24 horas
-
-/**
- * Limpia entradas expiradas del store
- */
-function cleanupExpiredEntries() {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitStore.delete(key);
-    }
-  }
-}
-
-/**
- * Verifica si una IP ha excedido el límite de rate
- * @param identifier - Identificador único (normalmente IP)
- * @returns true si está permitido, false si excedió el límite
- */
-export function checkRateLimit(identifier: string): {
+export async function checkRateLimit(identifier: string): Promise<{
   allowed: boolean;
   remaining: number;
   resetAt: number;
-} {
-  cleanupExpiredEntries();
-
+}> {
   const now = Date.now();
-  const entry = rateLimitStore.get(identifier);
+  const [entry] = await db
+    .select()
+    .from(contactRateLimits)
+    .where(eq(contactRateLimits.identifier, identifier))
+    .limit(1);
 
   if (!entry || now > entry.resetAt) {
-    // Nueva ventana de tiempo
     const resetAt = now + RATE_LIMIT_WINDOW;
-    rateLimitStore.set(identifier, {
-      count: 1,
-      resetAt,
-    });
+    await db
+      .insert(contactRateLimits)
+      .values({ identifier, count: 1, resetAt })
+      .onConflictDoUpdate({
+        target: contactRateLimits.identifier,
+        set: { count: 1, resetAt },
+      });
 
     return {
       allowed: true,
@@ -55,7 +35,6 @@ export function checkRateLimit(identifier: string): {
     };
   }
 
-  // Dentro de la ventana de tiempo existente
   if (entry.count >= MAX_REQUESTS_PER_WINDOW) {
     return {
       allowed: false,
@@ -64,25 +43,23 @@ export function checkRateLimit(identifier: string): {
     };
   }
 
-  // Incrementar contador
-  entry.count++;
-  rateLimitStore.set(identifier, entry);
+  const nextCount = entry.count + 1;
+  await db
+    .update(contactRateLimits)
+    .set({ count: nextCount })
+    .where(eq(contactRateLimits.identifier, identifier));
 
   return {
     allowed: true,
-    remaining: MAX_REQUESTS_PER_WINDOW - entry.count,
+    remaining: MAX_REQUESTS_PER_WINDOW - nextCount,
     resetAt: entry.resetAt,
   };
 }
 
-/**
- * Obtiene la IP del request
- */
 export function getClientIP(headers: Headers): string {
-  // Intenta obtener la IP real del cliente considerando proxies
   const forwarded = headers.get('x-forwarded-for');
   const real = headers.get('x-real-ip');
-  const cfConnecting = headers.get('cf-connecting-ip'); // Cloudflare
+  const cfConnecting = headers.get('cf-connecting-ip');
 
   if (forwarded) {
     return forwarded.split(',')[0].trim();

@@ -2,50 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { createContactMessage, markContactMessagesNotified } from '@/lib/content';
 import { sendContactNotificationEmail } from '@/lib/contact-email';
+import { isContactDailyLimitReached } from '@/lib/contact-daily-limit';
+import { validateContactSpam } from '@/lib/contact-spam-guard';
 import { isValidEmailFormat, normalizeEmail } from '@/lib/admin-validation';
-import { isContactTestMode } from '@/lib/contact-test-mode';
 import { checkRateLimit, getClientIP } from '@/lib/rate-limiter';
 
-const RECAPTCHA_THRESHOLD = 0.5;
-
-async function verifyRecaptcha(token: string): Promise<{ success: boolean; score?: number; error?: string }> {
-  try {
-    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: `secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${token}`,
-    });
-
-    const data = await response.json();
-
-    if (!data.success) {
-      console.error('reCAPTCHA verification failed:', data['error-codes']);
-      return { success: false, error: 'Verificación de CAPTCHA falló' };
-    }
-
-    console.log('reCAPTCHA score:', data.score);
-
-    if (data.score < RECAPTCHA_THRESHOLD) {
-      return {
-        success: false,
-        score: data.score,
-        error: 'Score de CAPTCHA muy bajo. Por favor intenta nuevamente.',
-      };
-    }
-
-    return { success: true, score: data.score };
-  } catch (error) {
-    console.error('Error verificando reCAPTCHA:', error);
-    return { success: false, error: 'Error en la verificación de CAPTCHA' };
-  }
-}
+const FAKE_SUCCESS_RESPONSE = {
+  success: true,
+  message: 'Mensaje enviado correctamente',
+};
 
 export async function POST(request: NextRequest) {
   try {
     const clientIP = getClientIP(request.headers);
-    const rateLimitResult = checkRateLimit(clientIP);
+    const rateLimitResult = await checkRateLimit(clientIP);
 
     if (!rateLimitResult.allowed) {
       const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
@@ -65,16 +35,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!isContactTestMode() && !process.env.RECAPTCHA_SECRET_KEY) {
-      console.error('RECAPTCHA_SECRET_KEY no está configurado');
-      return NextResponse.json(
-        { error: 'Configuración del servidor incompleta. Contacte al administrador.' },
-        { status: 500 }
-      );
+    const body = await request.json();
+    const { name, email, phone, message, website, formLoadedAt } = body;
+
+    const spamResult = validateContactSpam({ website, formLoadedAt });
+    if (spamResult.isBot) {
+      console.log('Contact spam rejected', { reason: spamResult.reason, ip: clientIP });
+      return NextResponse.json(FAKE_SUCCESS_RESPONSE, { status: 200 });
     }
 
-    const body = await request.json();
-    const { name, email, phone, message, recaptchaToken } = body;
+    const dailyLimit = await isContactDailyLimitReached();
+    if (dailyLimit.reached) {
+      console.log('Contact daily limit reached', {
+        count: dailyLimit.count,
+        limit: dailyLimit.limit,
+        ip: clientIP,
+      });
+      return NextResponse.json(
+        { error: 'No podemos recibir más mensajes hoy. Por favor intenta mañana.' },
+        { status: 503 }
+      );
+    }
 
     console.log('Datos recibidos:', {
       name,
@@ -82,22 +63,6 @@ export async function POST(request: NextRequest) {
       phone: phone ? 'presente' : 'no',
       message: message?.substring(0, 50),
     });
-
-    if (!isContactTestMode()) {
-      if (!recaptchaToken) {
-        return NextResponse.json({ error: 'Token de CAPTCHA no proporcionado' }, { status: 400 });
-      }
-
-      const recaptchaResult = await verifyRecaptcha(recaptchaToken);
-      if (!recaptchaResult.success) {
-        return NextResponse.json(
-          { error: recaptchaResult.error || 'Verificación de CAPTCHA falló' },
-          { status: 400 }
-        );
-      }
-    } else {
-      console.log('CONTACT_TEST_MODE activo — reCAPTCHA omitido');
-    }
 
     if (!name || !email || !message) {
       return NextResponse.json(

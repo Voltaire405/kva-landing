@@ -1,27 +1,25 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+import { FormEvent, useEffect, useState } from 'react';
 
 import ContactInfoDisplay from '@/components/ContactInfo';
 import type { ContactInfo } from '@/db/schema';
-import { isContactTestModeClient } from '@/lib/contact-test-mode';
 
 interface ContactSectionProps {
   contactInfo: ContactInfo;
 }
 
-interface ContactFormProps extends ContactSectionProps {
-  getRecaptchaToken?: () => Promise<string>;
-  showRecaptchaNotice: boolean;
-}
-
-function ContactForm({ contactInfo, getRecaptchaToken, showRecaptchaNotice }: ContactFormProps) {
+export default function ContactSection({ contactInfo }: ContactSectionProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formLoadedAt, setFormLoadedAt] = useState<number | null>(null);
   const [submitStatus, setSubmitStatus] = useState<{
     type: 'success' | 'error' | null;
     message: string;
   }>({ type: null, message: '' });
+
+  useEffect(() => {
+    setFormLoadedAt(Date.now());
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -31,19 +29,14 @@ function ContactForm({ contactInfo, getRecaptchaToken, showRecaptchaNotice }: Co
     const form = e.currentTarget;
 
     try {
-      let recaptchaToken: string | undefined;
-
-      if (getRecaptchaToken) {
-        recaptchaToken = await getRecaptchaToken();
-      }
-
       const formData = new FormData(form);
       const data = {
         name: formData.get('name') as string,
         email: formData.get('email') as string,
         phone: formData.get('phone') as string,
         message: formData.get('message') as string,
-        ...(recaptchaToken ? { recaptchaToken } : {}),
+        website: formData.get('website') as string,
+        formLoadedAt: formLoadedAt ?? Date.now(),
       };
 
       const response = await fetch('/api/contact', {
@@ -62,6 +55,7 @@ function ContactForm({ contactInfo, getRecaptchaToken, showRecaptchaNotice }: Co
           message: '¡Mensaje enviado correctamente! Nos comunicaremos contigo pronto.',
         });
         form.reset();
+        setFormLoadedAt(Date.now());
       } else {
         console.error('Error del servidor:', result);
         setSubmitStatus({
@@ -101,7 +95,15 @@ function ContactForm({ contactInfo, getRecaptchaToken, showRecaptchaNotice }: Co
                 <p className="text-sm sm:text-base">{submitStatus.message}</p>
               </div>
             )}
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className="relative">
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute -left-[9999px] h-0 w-0 opacity-0 pointer-events-none"
+              />
               <div className="mb-4 sm:mb-5">
                 <label htmlFor="name" className="block mb-2 font-medium text-sm sm:text-base">
                   Nombre
@@ -155,61 +157,10 @@ function ContactForm({ contactInfo, getRecaptchaToken, showRecaptchaNotice }: Co
               >
                 {isSubmitting ? 'Enviando...' : 'Enviar mensaje'}
               </button>
-              {showRecaptchaNotice && (
-                <p className="text-xs text-gray-500 mt-4">
-                  Este sitio está protegido por reCAPTCHA y se aplican la{' '}
-                  <a
-                    href="https://policies.google.com/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Política de privacidad
-                  </a>{' '}
-                  y los{' '}
-                  <a
-                    href="https://policies.google.com/terms"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Términos de servicio
-                  </a>{' '}
-                  de Google.
-                </p>
-              )}
             </form>
           </div>
         </div>
       </div>
     </section>
   );
-}
-
-function ContactSectionWithRecaptcha(props: ContactSectionProps) {
-  const { executeRecaptcha } = useGoogleReCaptcha();
-
-  const getRecaptchaToken = async () => {
-    if (!executeRecaptcha) {
-      throw new Error('reCAPTCHA no está disponible');
-    }
-
-    return executeRecaptcha('contact_form');
-  };
-
-  return (
-    <ContactForm
-      {...props}
-      getRecaptchaToken={getRecaptchaToken}
-      showRecaptchaNotice
-    />
-  );
-}
-
-export default function ContactSection(props: ContactSectionProps) {
-  if (isContactTestModeClient()) {
-    return <ContactForm {...props} showRecaptchaNotice={false} />;
-  }
-
-  return <ContactSectionWithRecaptcha {...props} />;
 }
