@@ -27,7 +27,7 @@ Landing page corporativa de **KvaTel Soluciones** — instalaciones eléctricas 
 - Autenticación mediante código de acceso (bootstrap vía `.env`, persistido en Turso desde Configuración)
 - CRUD de servicios, trabajos, clientes, testimonios e información de contacto
 - Bandeja de mensajes recibidos del formulario (`/admin/messages`): listado, lectura y eliminación
-- Notificaciones por correo en lote cada hora (`CONTACT_EMAIL_CRON_ENABLED=true`)
+- Notificaciones por correo en lote una vez al día (`CONTACT_EMAIL_CRON_ENABLED=true`)
 - Subida de imágenes del portafolio a Vercel Blob
 
 ## Estructura del proyecto
@@ -90,7 +90,7 @@ Completar todas las variables en `.env.local`:
 | `CONTACT_TEST_MODE` | `true` en local para omitir honeypot, tiempo mínimo y límite diario en la API |
 | `CONTACT_DAILY_MESSAGE_LIMIT` | Máximo de mensajes guardados por día (default `50`; día calendario America/Bogota) |
 | `SEND_CONTACT_EMAIL` | `true` para enviar notificación inmediata por email al recibir un mensaje (anula el cron) |
-| `CONTACT_EMAIL_CRON_ENABLED` | `true` para resumen en lote cada hora vía Vercel Cron |
+| `CONTACT_EMAIL_CRON_ENABLED` | `true` para resumen en lote diario vía Vercel Cron |
 | `RESEND_API_KEY` | API key de Resend (inmediato y/o lote programado) |
 | `RESEND_FROM_EMAIL` | Remitente (opcional; default `Formulario KvaTel <onboarding@resend.dev>`) |
 | `CRON_SECRET` | Secreto para autenticar el cron (Vercel lo inyecta en producción; definir en local para pruebas) |
@@ -139,13 +139,13 @@ En producción no configures esta variable (o déjala en `false`).
 2. Configurar las mismas variables de entorno que en `.env.example`.
 3. Tras el primer deploy, ejecutar `db:migrate` y `db:seed` contra la base Turso de producción.
 4. El panel admin queda disponible en `https://tu-dominio.vercel.app/admin/login`.
-5. Configura `RESEND_API_KEY`, `CONTACT_EMAIL_CRON_ENABLED=true` (o `SEND_CONTACT_EMAIL=true` para modo inmediato) y verifica que el email de contacto en `/admin/contact` sea válido. El cron en `vercel.json` se ejecuta cada hora (`0 * * * *`).
+5. Configura `RESEND_API_KEY`, `CONTACT_EMAIL_CRON_ENABLED=true` (o `SEND_CONTACT_EMAIL=true` para modo inmediato) y verifica que el email de contacto en `/admin/contact` sea válido. El cron en `vercel.json` se ejecuta una vez al día (`0 0 * * *`, 00:00 UTC; el plan Hobby de Vercel no permite más).
 
 ## Notas
 
 - **Formulario de contacto:** los mensajes se guardan en la tabla `contact_messages` de Turso. Límite global de **50 mensajes/día** por defecto (`CONTACT_DAILY_MESSAGE_LIMIT`); al alcanzarlo la API responde 503. Modos de email con Resend:
   - **Inmediato:** `SEND_CONTACT_EMAIL=true` — un correo por mensaje; el cron no procesa.
-  - **Lote horario:** `CONTACT_EMAIL_CRON_ENABLED=true` — resumen cada hora si hay mensajes nuevos. Destinatario: email en `/admin/contact`.
+  - **Lote diario:** `CONTACT_EMAIL_CRON_ENABLED=true` — resumen diario si hay mensajes nuevos. Destinatario: email en `/admin/contact`.
   - **Ninguno:** sin esas variables — solo Turso y panel admin.
 - **Autenticación admin:** `ADMIN_ACCESS_CODE` permite el primer acceso cuando aún no hay código en la base de datos. Tras guardar un código en `/admin/settings`, el login valida exclusivamente contra Turso y la variable de entorno deja de usarse.
 - Resend está externalizado en `next.config.ts` (`serverExternalPackages`) para compatibilidad con el bundler de Next.js en desarrollo.

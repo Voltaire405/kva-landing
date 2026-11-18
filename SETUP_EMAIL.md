@@ -47,7 +47,7 @@ Este proyecto utiliza **Resend** con su SDK oficial para el envío de correos el
 
 ### 4. Notificaciones en lote (Vercel Cron)
 
-Además del envío inmediato (`SEND_CONTACT_EMAIL=true`), puedes activar un **resumen horario** con:
+Además del envío inmediato (`SEND_CONTACT_EMAIL=true`), puedes activar un **resumen diario** con:
 
 ```env
 CONTACT_EMAIL_CRON_ENABLED=true
@@ -56,7 +56,7 @@ CONTACT_EMAIL_CRON_ENABLED=true
 | Modo | Variable | Comportamiento |
 |---|---|---|
 | Inmediato | `SEND_CONTACT_EMAIL=true` | Un correo por mensaje; el cron no procesa |
-| Lote horario | `CONTACT_EMAIL_CRON_ENABLED=true` | Resumen cada hora si hay mensajes nuevos |
+| Lote diario | `CONTACT_EMAIL_CRON_ENABLED=true` | Resumen diario si hay mensajes nuevos |
 | Ninguno | (ninguna) | Solo Turso + panel admin |
 
 **Variables adicionales en Vercel:**
@@ -65,7 +65,7 @@ CONTACT_EMAIL_CRON_ENABLED=true
 - `RESEND_API_KEY`: requerida para el envío en lote e inmediato.
 - El destinatario se toma del **email de contacto** configurado en `/admin/contact` (tabla `contact_info` en Turso).
 
-**Cron en `vercel.json`:** se ejecuta **cada hora** (`0 * * * *`). Solo envía si hay mensajes sin notificar y el email de contacto es válido.
+**Cron en `vercel.json`:** se ejecuta **una vez al día** (`0 0 * * *`, 00:00 UTC; el plan Hobby de Vercel no permite más). Solo envía si hay mensajes sin notificar y el email de contacto es válido.
 
 **Probar el cron localmente:**
 
