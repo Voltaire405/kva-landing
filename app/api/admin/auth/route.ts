@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   clearSessionCookie,
   createSessionCookie,
-  verifyAccessCode,
+  findAdminByCode,
 } from '@/lib/admin-auth';
 
 export async function POST(request: NextRequest) {
@@ -11,11 +11,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const code = typeof body.code === 'string' ? body.code.trim() : '';
 
-    if (!code || !(await verifyAccessCode(code))) {
+    const admin = code ? await findAdminByCode(code) : null;
+
+    if (!admin) {
       return NextResponse.json({ error: 'Código inválido' }, { status: 401 });
     }
 
-    await createSessionCookie();
+    await createSessionCookie(admin);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Error de autenticación' }, { status: 500 });

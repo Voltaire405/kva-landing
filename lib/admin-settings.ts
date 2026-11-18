@@ -6,20 +6,17 @@ import { db } from '@/db';
 import { adminSettings, type AdminSettings } from '@/db/schema';
 
 const scryptAsync = promisify(scrypt);
-const ADMIN_SETTINGS_ID = 1;
 
-export async function getAdminSettings(): Promise<AdminSettings | null> {
-  const rows = await db
-    .select()
-    .from(adminSettings)
-    .where(eq(adminSettings.id, ADMIN_SETTINGS_ID))
-    .limit(1);
+export const BOOTSTRAP_ADMIN_ID = 0;
 
-  return rows[0] ?? null;
+export type AdminIdentity = { id: number; sessionSecret: string };
+
+export async function listAdmins(): Promise<AdminSettings[]> {
+  return db.select().from(adminSettings);
 }
 
-export function isConfiguredInDatabase(settings: AdminSettings | null): boolean {
-  return settings !== null;
+export function isConfiguredInDatabase(admins: AdminSettings[]): boolean {
+  return admins.length > 0;
 }
 
 export function getBootstrapAccessCode(): string {
@@ -64,44 +61,58 @@ function verifyBootstrapAccessCode(code: string): boolean {
   return timingSafeEqual(provided, expectedBuffer);
 }
 
-export async function verifyAccessCode(code: string): Promise<boolean> {
-  const settings = await getAdminSettings();
+export async function findAdminByCode(code: string): Promise<AdminIdentity | null> {
+  const admins = await listAdmins();
 
-  if (settings) {
-    return verifyAccessCodeHash(code, settings.accessCodeHash);
+  if (admins.length === 0) {
+    return verifyBootstrapAccessCode(code)
+      ? { id: BOOTSTRAP_ADMIN_ID, sessionSecret: getBootstrapAccessCode() }
+      : null;
   }
 
-  return verifyBootstrapAccessCode(code);
+  for (const admin of admins) {
+    if (await verifyAccessCodeHash(code, admin.accessCodeHash)) {
+      return { id: admin.id, sessionSecret: admin.sessionSecret };
+    }
+  }
+
+  return null;
 }
 
-export async function resolveSessionSecret(): Promise<string> {
-  const settings = await getAdminSettings();
+export async function resolveSessionSecret(adminId: number): Promise<string | null> {
+  const admins = await listAdmins();
 
-  if (settings) {
-    return settings.sessionSecret;
+  if (adminId === BOOTSTRAP_ADMIN_ID) {
+    return admins.length === 0 ? getBootstrapAccessCode() : null;
   }
 
-  return getBootstrapAccessCode();
+  return admins.find((admin) => admin.id === adminId)?.sessionSecret ?? null;
 }
 
 function generateSessionSecret(): string {
   return randomBytes(32).toString('hex');
 }
 
-export async function persistAccessCode(newCode: string): Promise<AdminSettings> {
+export class DuplicateAccessCodeError extends Error {}
+
+/** Con `adminId` reemplaza el código de ese admin; sin él (o con el bootstrap) registra un admin nuevo. */
+export async function persistAccessCode(
+  newCode: string,
+  adminId: number = BOOTSTRAP_ADMIN_ID
+): Promise<AdminSettings> {
+  const owner = await findAdminByCode(newCode);
+  if (owner && owner.id !== BOOTSTRAP_ADMIN_ID) {
+    throw new DuplicateAccessCodeError('El código ya está en uso');
+  }
+
   const accessCodeHash = await hashAccessCode(newCode);
   const sessionSecret = generateSessionSecret();
-  const existing = await getAdminSettings();
 
-  if (existing) {
+  if (adminId !== BOOTSTRAP_ADMIN_ID) {
     const [updated] = await db
       .update(adminSettings)
-      .set({
-        accessCodeHash,
-        sessionSecret,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(adminSettings.id, ADMIN_SETTINGS_ID))
+      .set({ accessCodeHash, sessionSecret, updatedAt: new Date().toISOString() })
+      .where(eq(adminSettings.id, adminId))
       .returning();
 
     return updated;
@@ -109,11 +120,7 @@ export async function persistAccessCode(newCode: string): Promise<AdminSettings>
 
   const [created] = await db
     .insert(adminSettings)
-    .values({
-      id: ADMIN_SETTINGS_ID,
-      accessCodeHash,
-      sessionSecret,
-    })
+    .values({ accessCodeHash, sessionSecret })
     .returning();
 
   return created;

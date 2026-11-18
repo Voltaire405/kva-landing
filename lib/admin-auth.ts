@@ -3,23 +3,24 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 import {
+  DuplicateAccessCodeError,
+  findAdminByCode,
   persistAccessCode,
   resolveSessionSecret,
-  verifyAccessCode,
+  type AdminIdentity,
 } from '@/lib/admin-settings';
 
 export const ADMIN_SESSION_COOKIE = 'admin_session';
 
-async function createSessionToken(): Promise<string> {
-  const secret = await resolveSessionSecret();
+function signSession(secret: string): string {
   return createHmac('sha256', secret).update('admin-session').digest('hex');
 }
 
-export { verifyAccessCode } from '@/lib/admin-settings';
+export { findAdminByCode } from '@/lib/admin-settings';
 
-export async function createSessionCookie() {
+export async function createSessionCookie({ id, sessionSecret }: AdminIdentity) {
   const cookieStore = await cookies();
-  cookieStore.set(ADMIN_SESSION_COOKIE, await createSessionToken(), {
+  cookieStore.set(ADMIN_SESSION_COOKIE, `${id}.${signSession(sessionSecret)}`, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -42,9 +43,15 @@ export async function isAdminAuthenticated(): Promise<boolean> {
   }
 
   try {
-    const expected = await createSessionToken();
-    const sessionBuffer = Buffer.from(session);
-    const expectedBuffer = Buffer.from(expected);
+    const [id, signature] = session.split('.');
+    const secret = await resolveSessionSecret(Number(id));
+
+    if (secret === null || !signature) {
+      return false;
+    }
+
+    const sessionBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(signSession(secret));
 
     if (sessionBuffer.length !== expectedBuffer.length) {
       return false;
@@ -73,13 +80,21 @@ export async function updateAccessCode({
   currentCode: string;
   newCode: string;
 }): Promise<{ success: true } | { success: false; error: string; status: number }> {
-  const currentValid = await verifyAccessCode(currentCode);
+  const admin = await findAdminByCode(currentCode);
 
-  if (!currentValid) {
+  if (!admin) {
     return { success: false, error: 'Código actual incorrecto', status: 401 };
   }
 
-  await persistAccessCode(newCode);
+  try {
+    await persistAccessCode(newCode, admin.id);
+  } catch (error) {
+    if (error instanceof DuplicateAccessCodeError) {
+      return { success: false, error: error.message, status: 409 };
+    }
+    throw error;
+  }
+
   await clearSessionCookie();
 
   return { success: true };
